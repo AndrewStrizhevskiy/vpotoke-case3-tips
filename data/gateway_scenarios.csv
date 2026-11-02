@@ -1,0 +1,3 @@
+qr_id,result,error_code,reason
+qr_001,SUCCESS,,T3-1
+qr_003,DECLINED,CARD_DECLINED,T3-2

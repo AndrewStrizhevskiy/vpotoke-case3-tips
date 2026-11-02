@@ -1,0 +1,486 @@
+# API платформы чаевых — кейс 3
+#
+# Health и QRPayload — образцы организаторов, оставлены без изменений.
+# Остальное заполнено по ADR-001…009 (docs/). Отступления от TODO шаблона:
+#   - TipCreate: tip_pct или tip_amount, ровно одно из двух (ADR-004, «своя сумма»);
+#     idempotency_key обязателен (ADR-008).
+#   - GET /api/v1/qr/{qr_id} требует параметр sig: без него перебор qr_id открывает чужие чеки (ADR-003).
+#   - confirm и cancel требуют confirm_token, выданный при создании платежа:
+#     клиент анонимен, и без токена любой, кто знает payment_id, мог бы отменить чужой платёж.
+#   - /reports/tips: ровно один из merchant_id или employee_id (отчёт по официанту из 09_reports).
+#   - Добавлены POST /api/v1/qr, GET /api/v1/payments/{id}, /reports/tips/daily,
+#     PATCH /api/v1/merchants/{id}/status — без них не закрываются FR и RBAC.
+# Проверка: npx @redocly/cli lint или https://editor.swagger.io/
+
+openapi: 3.0.3
+info:
+  title: Tips Platform
+  version: "1.0.0"
+  description: Онлайн-чаевые для сети «Вкус-Сервис»
+
+servers:
+  - url: http://localhost:8083
+
+tags:
+  - name: qr
+  - name: payments
+  - name: reports
+  - name: admin
+
+# ---------- ОБРАЗЕЦ ----------
+components:
+  schemas:
+    QRPayload:
+      type: object
+      required: [merchant_id, employee_id, receipt_id, nonce, exp, signature]
+      properties:
+        merchant_id: {type: string, pattern: '^m_[0-9]{3}$'}
+        employee_id: {type: string, pattern: '^e_[0-9]{3}$'}
+        receipt_id: {type: string, pattern: '^r_[0-9]{4}$'}
+        nonce: {type: string, pattern: '^[a-f0-9]{6}$'}
+        exp: {type: string, format: date-time}
+        signature: {type: string, pattern: '^[a-f0-9]{16}$'}
+
+# ---------- ЗАПОЛНЕНО ----------
+    Money:
+      type: number
+      description: Сумма в рублях, 2 знака после запятой, округление ROUND_HALF_UP
+      minimum: 0
+      example: 668.85
+
+    PaymentStatus:
+      type: string
+      enum: [CREATED, PENDING, SUCCESS, DECLINED, CANCELED]
+
+    QRCreate:
+      type: object
+      required: [merchant_id, employee_id, receipt_id]
+      properties:
+        merchant_id: {type: string, pattern: '^m_[0-9]{3}$'}
+        employee_id: {type: string, pattern: '^e_[0-9]{3}$'}
+        receipt_id: {type: string, pattern: '^r_[0-9]{4}$'}
+
+    QRCreated:
+      type: object
+      required: [qr_id, pay_url, exp]
+      properties:
+        qr_id: {type: string, pattern: '^qr_[0-9]{3}$'}
+        pay_url:
+          type: string
+          format: uri
+          description: Ссылка для QR-кода, содержит qr_id и подпись
+          example: https://tips.example/pay?qr=qr_001&sig=68d0f361ac38c12b
+        exp: {type: string, format: date-time}
+        qr_png_base64: {type: string, description: "Картинка QR-кода (PNG, base64)"}
+
+    QRResponse:
+      type: object
+      description: Данные для формы чаевых (экраны 1–2). Сумма берётся из реестра чеков, а не от клиента.
+      required: [qr_id, merchant_id, merchant_name, employee_id, employee_name, receipt_id, base_amount, currency, tip_options, exp]
+      properties:
+        qr_id: {type: string, pattern: '^qr_[0-9]{3}$'}
+        merchant_id: {type: string, pattern: '^m_[0-9]{3}$'}
+        merchant_name: {type: string, maxLength: 100}
+        employee_id: {type: string, pattern: '^e_[0-9]{3}$'}
+        employee_name: {type: string, maxLength: 100}
+        receipt_id: {type: string, pattern: '^r_[0-9]{4}$'}
+        base_amount: {$ref: '#/components/schemas/Money'}
+        currency: {type: string, enum: [RUB]}
+        tip_options:
+          type: array
+          description: Проценты для кнопок; «своя сумма» — через tip_amount
+          items: {type: integer, minimum: 0, maximum: 50}
+        max_tip_pct: {type: integer, enum: [50]}
+        exp: {type: string, format: date-time}
+      example:
+        qr_id: qr_001
+        merchant_id: m_001
+        merchant_name: Вкус-Сервис Тверская
+        employee_id: e_001
+        employee_name: Иванов И.
+        receipt_id: r_1001
+        base_amount: 637.00
+        currency: RUB
+        tip_options: [0, 5, 10, 15, 20]
+        max_tip_pct: 50
+        exp: "2025-11-01T23:59:00Z"
+
+    TipCreate:
+      type: object
+      required: [qr_id, receipt_id, base_amount, idempotency_key]
+      description: >
+        Ровно одно из tip_pct или tip_amount. base_amount сверяется с реестром чеков
+        (несовпадение — 422 AMOUNT_MISMATCH).
+      properties:
+        qr_id: {type: string, pattern: '^qr_[0-9]{3}$'}
+        receipt_id: {type: string, pattern: '^r_[0-9]{4}$'}
+        base_amount:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          maximum: 1000000
+        tip_pct: {type: integer, minimum: 0, maximum: 50}
+        tip_amount: {type: number, minimum: 0, description: "«Своя сумма», не больше base_amount × 0.5"}
+        idempotency_key: {type: string, format: uuid}
+      oneOf:
+        - required: [tip_pct]
+        - required: [tip_amount]
+      example:
+        qr_id: qr_001
+        receipt_id: r_1001
+        base_amount: 637.00
+        tip_pct: 5
+        idempotency_key: 3f1c2a9e-7b4d-4e1a-9c2f-5d8e6b7a1c00
+
+    ConfirmRequest:
+      type: object
+      required: [confirm_token]
+      properties:
+        confirm_token: {type: string, minLength: 32, description: Выдан в ответе на POST /tips}
+
+    Payment:
+      type: object
+      required: [payment_id, qr_id, status, base_amount, tip_amount, amount_total, currency, created_at]
+      properties:
+        payment_id: {type: string, pattern: '^p_[0-9]{4}$'}
+        qr_id: {type: string, pattern: '^qr_[0-9]{3}$'}
+        status: {$ref: '#/components/schemas/PaymentStatus'}
+        base_amount: {$ref: '#/components/schemas/Money'}
+        tip_amount: {$ref: '#/components/schemas/Money'}
+        amount_total: {$ref: '#/components/schemas/Money'}
+        currency: {type: string, enum: [RUB]}
+        confirm_token:
+          type: string
+          description: Только в ответе на POST /tips; нужен для confirm и cancel
+        error_code:
+          type: string
+          nullable: true
+          enum: [CARD_DECLINED, GATEWAY_TIMEOUT, null]
+        created_at: {type: string, format: date-time}
+      example:
+        payment_id: p_0101
+        qr_id: qr_001
+        status: CREATED
+        base_amount: 637.00
+        tip_amount: 31.85
+        amount_total: 668.85
+        currency: RUB
+        confirm_token: 9b7e2c41d0a84f3e8a6b5c2d1e0f9a8b
+        error_code: null
+        created_at: "2025-11-01T18:00:00Z"
+
+    MerchantStatusUpdate:
+      type: object
+      required: [status, reason]
+      properties:
+        status: {type: string, enum: [ACTIVE, BLOCKED]}
+        reason: {type: string, minLength: 1, maxLength: 200}
+
+    Report:
+      type: object
+      description: Отчёт по мерчанту. Суммы и средние — только по SUCCESS (ADR-007).
+      required: [merchant_id, period, tips_total, payments_count, avg_tip_pct, success_rate]
+      properties:
+        merchant_id: {type: string, pattern: '^m_[0-9]{3}$'}
+        period: {type: string, pattern: '^[0-9]{4}-[0-9]{2}$'}
+        tips_total: {$ref: '#/components/schemas/Money'}
+        payments_count: {type: integer, minimum: 0}
+        avg_tip_pct: {type: number, minimum: 0, maximum: 50, nullable: true}
+        success_rate: {type: number, minimum: 0, maximum: 1}
+      example:
+        merchant_id: m_001
+        period: "2025-11"
+        tips_total: 414.85
+        payments_count: 6
+        avg_tip_pct: 9.00
+        success_rate: 0.83
+
+    EmployeeReport:
+      type: object
+      required: [employee_id, period, tips_total, payments_count, avg_tip_amount, top_day]
+      properties:
+        employee_id: {type: string, pattern: '^e_[0-9]{3}$'}
+        period: {type: string, pattern: '^[0-9]{4}-[0-9]{2}$'}
+        tips_total: {$ref: '#/components/schemas/Money'}
+        payments_count: {type: integer, minimum: 0}
+        avg_tip_amount: {type: number, minimum: 0, nullable: true}
+        top_day: {type: string, format: date, nullable: true}
+      example:
+        employee_id: e_001
+        period: "2025-11"
+        tips_total: 83.60
+        payments_count: 2
+        avg_tip_amount: 41.80
+        top_day: "2025-11-03"
+
+    DailyReport:
+      type: object
+      required: [merchant_id, daily]
+      properties:
+        merchant_id: {type: string, pattern: '^m_[0-9]{3}$'}
+        daily:
+          type: array
+          items:
+            type: object
+            required: [date, tips_total, payments_count, avg_tip_pct]
+            properties:
+              date: {type: string, format: date}
+              tips_total: {$ref: '#/components/schemas/Money'}
+              payments_count: {type: integer, minimum: 0}
+              avg_tip_pct: {type: number, minimum: 0, maximum: 50, nullable: true}
+      example:
+        merchant_id: m_001
+        daily:
+          - {date: "2025-11-01", tips_total: 245.90, payments_count: 3, avg_tip_pct: 10.00}
+          - {date: "2025-11-03", tips_total: 168.95, payments_count: 3, avg_tip_pct: 7.50}
+
+    Error:
+      type: object
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+          enum: [INVALID_QR, QR_EXPIRED, QR_USED, MERCHANT_BLOCKED, RECEIPT_MISMATCH,
+                 AMOUNT_MISMATCH, TIP_OUT_OF_RANGE, AMOUNT_OUT_OF_RANGE, IDEMPOTENCY_CONFLICT,
+                 PAYMENT_IN_PROGRESS, CARD_DECLINED, GATEWAY_TIMEOUT, CANCEL_NOT_ALLOWED,
+                 PAYMENT_STATE_CONFLICT, NOT_FOUND, VALIDATION_ERROR, ACCESS_DENIED, RATE_LIMITED]
+        message: {type: string}
+        retryable: {type: boolean}
+        details:
+          type: object
+          additionalProperties: true
+          description: Без секретов, подписей и полных реквизитов
+      example:
+        error_code: QR_EXPIRED
+        message: Срок действия QR истёк
+        retryable: true
+        details: {qr_id: qr_001, exp: "2025-11-01T23:59:00Z"}
+
+  parameters:
+    PaymentId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, pattern: '^p_[0-9]{4}$'}
+    From:
+      name: from
+      in: query
+      required: true
+      schema: {type: string, format: date}
+    To:
+      name: to
+      in: query
+      required: true
+      schema: {type: string, format: date}
+
+  responses:
+    BadRequest:
+      description: VALIDATION_ERROR — неверный формат запроса
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Forbidden:
+      description: MERCHANT_BLOCKED или ACCESS_DENIED
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    NotFound:
+      description: NOT_FOUND
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Conflict:
+      description: QR_USED, IDEMPOTENCY_CONFLICT, PAYMENT_IN_PROGRESS, CANCEL_NOT_ALLOWED, PAYMENT_STATE_CONFLICT
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Gone:
+      description: QR_EXPIRED — нужен новый QR
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Unprocessable:
+      description: INVALID_QR, RECEIPT_MISMATCH, AMOUNT_MISMATCH, TIP_OUT_OF_RANGE, AMOUNT_OUT_OF_RANGE
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    TooManyRequests:
+      description: RATE_LIMITED
+      headers:
+        Retry-After: {schema: {type: integer}, description: Секунды до следующей попытки}
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Роль (merchant, waiter, admin) и merchant_id / employee_id берутся из токена
+
+paths:
+  # ---------- ОБРАЗЕЦ ----------
+  /health:
+    get:
+      summary: Проверка живости
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {type: object, properties: {status: {type: string}}}
+
+  # ---------- ЗАПОЛНЕНО ----------
+  /api/v1/qr:
+    post:
+      tags: [qr]
+      summary: Сгенерировать QR на чек (мерчант, официант)
+      description: >
+        Проверки: мерчант ACTIVE, официант принадлежит мерчанту, чек есть в реестре.
+        Официант может выпустить QR только на себя.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/QRCreate'}}}
+      responses:
+        '201':
+          description: QR создан
+          content: {application/json: {schema: {$ref: '#/components/schemas/QRCreated'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  /api/v1/qr/{qr_id}:
+    get:
+      tags: [qr]
+      summary: Данные QR для формы чаевых (клиент, без авторизации)
+      description: Порядок проверок Q-1…Q-5 — ADR-004. Неверная подпись не раскрывает, существует ли qr_id.
+      parameters:
+        - {name: qr_id, in: path, required: true, schema: {type: string, pattern: '^qr_[0-9]{3}$'}}
+        - {name: sig, in: query, required: true, schema: {type: string, pattern: '^[a-f0-9]{16}$'}}
+      responses:
+        '200':
+          description: QR действителен
+          content: {application/json: {schema: {$ref: '#/components/schemas/QRResponse'}}}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '410': {$ref: '#/components/responses/Gone'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  /api/v1/tips:
+    post:
+      tags: [payments]
+      summary: Создать платёж с чаевыми (клиент)
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/TipCreate'}}}
+      responses:
+        '201':
+          description: Платёж создан в статусе CREATED
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '200':
+          description: Повтор того же idempotency_key — возвращён существующий платёж (P-2)
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '410': {$ref: '#/components/responses/Gone'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  /api/v1/payments/{id}:
+    get:
+      tags: [payments]
+      summary: Статус платежа (опрос после 202)
+      parameters:
+        - {$ref: '#/components/parameters/PaymentId'}
+        - {name: confirm_token, in: query, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Текущий статус
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /api/v1/payments/{id}/confirm:
+    post:
+      tags: [payments]
+      summary: Подтвердить платёж — CREATED → PENDING → итог от шлюза
+      description: Повторный confirm не вызывает шлюз, а возвращает текущий статус.
+      parameters: [{$ref: '#/components/parameters/PaymentId'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/ConfirmRequest'}}}
+      responses:
+        '200':
+          description: SUCCESS
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '202':
+          description: PENDING, GATEWAY_TIMEOUT — опросить GET /payments/{id}
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '402':
+          description: DECLINED, CARD_DECLINED
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /api/v1/payments/{id}/cancel:
+    post:
+      tags: [payments]
+      summary: Отменить платёж — только из CREATED (P-4)
+      parameters: [{$ref: '#/components/parameters/PaymentId'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/ConfirmRequest'}}}
+      responses:
+        '200':
+          description: CANCELED
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: CANCEL_NOT_ALLOWED (из PENDING или SUCCESS) или PAYMENT_STATE_CONFLICT
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+
+  /api/v1/reports/tips:
+    get:
+      tags: [reports]
+      summary: Отчёт по чаевым — по мерчанту или по официанту
+      description: >
+        Ровно один из merchant_id или employee_id, иначе 400. Мерчант видит только себя,
+        официант — только свой employee_id из токена, администратор — всё.
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: merchant_id, in: query, required: false, schema: {type: string, pattern: '^m_[0-9]{3}$'}}
+        - {name: employee_id, in: query, required: false, schema: {type: string, pattern: '^e_[0-9]{3}$'}}
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+      responses:
+        '200':
+          description: Отчёт
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - {$ref: '#/components/schemas/Report'}
+                  - {$ref: '#/components/schemas/EmployeeReport'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /api/v1/reports/tips/daily:
+    get:
+      tags: [reports]
+      summary: Отчёт мерчанта по дням
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: merchant_id, in: query, required: true, schema: {type: string, pattern: '^m_[0-9]{3}$'}}
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+      responses:
+        '200':
+          description: Разбивка по дням
+          content: {application/json: {schema: {$ref: '#/components/schemas/DailyReport'}}}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /api/v1/merchants/{merchant_id}/status:
+    patch:
+      tags: [admin]
+      summary: Активировать или заблокировать мерчанта (только администратор)
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: merchant_id, in: path, required: true, schema: {type: string, pattern: '^m_[0-9]{3}$'}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/MerchantStatusUpdate'}}}
+      responses:
+        '200': {description: "Статус изменён, событие записано в аудит"}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}

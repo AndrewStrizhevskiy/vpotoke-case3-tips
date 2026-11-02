@@ -1,0 +1,114 @@
+# API платформы чаевых — кейс 3
+#
+# Как заполнять:
+#   1. Health и QRPayload — образцы, не трогать.
+#   2. Заполни Payment, QRResponse, TipCreate, Report, Error.
+#   3. Проверь на https://editor.swagger.io/
+
+openapi: 3.0.3
+info:
+  title: Tips Platform
+  version: "1.0.0"
+  description: Онлайн-чаевые для сети «Вкус-Сервис»
+
+servers:
+  - url: http://localhost:8083
+
+# ---------- ОБРАЗЕЦ ----------
+components:
+  schemas:
+    QRPayload:
+      type: object
+      required: [merchant_id, employee_id, receipt_id, nonce, exp, signature]
+      properties:
+        merchant_id: {type: string, pattern: '^m_[0-9]{3}$'}
+        employee_id: {type: string, pattern: '^e_[0-9]{3}$'}
+        receipt_id: {type: string, pattern: '^r_[0-9]{4}$'}
+        nonce: {type: string, pattern: '^[a-f0-9]{6}$'}
+        exp: {type: string, format: date-time}
+        signature: {type: string, pattern: '^[a-f0-9]{16}$'}
+
+# ---------- TODO ----------
+    QRResponse:
+      type: object
+      properties:
+        # TODO: qr_id, merchant_id, employee_id, employee_name,
+        #       receipt_id, base_amount, currency, tip_options
+        ?
+
+    TipCreate:
+      type: object
+      required: [qr_id, receipt_id, base_amount, tip_pct]
+      properties:
+        # TODO: qr_id, receipt_id, base_amount, tip_pct (0..50),
+        #       idempotency_key
+        ?
+
+    Payment:
+      type: object
+      properties:
+        # TODO: payment_id, status (CREATED/PENDING/SUCCESS/DECLINED/CANCELED),
+        #       amount_total, tip_amount, confirm_token, error_code
+        ?
+
+    Report:
+      type: object
+      properties:
+        # TODO: merchant_id, period, tips_total, payments_count,
+        #       avg_tip_pct, success_rate
+        ?
+
+    Error:
+      type: object
+      required: [error_code, message]
+      properties:
+        # TODO: error_code, message, retryable, details
+        ?
+
+paths:
+  # ---------- ОБРАЗЕЦ ----------
+  /health:
+    get:
+      summary: Проверка живости
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {type: object, properties: {status: {type: string}}}
+
+  # ---------- TODO ----------
+  /api/v1/qr/{qr_id}:
+    get:
+      summary: TODO — данные QR для формы чаевых
+      parameters: [{name: qr_id, in: path, required: true, schema: {type: string}}]
+      # TODO: responses 200 (QRResponse), 404, 410 (QR_EXPIRED), 422 (INVALID_QR)
+      ?
+
+  /api/v1/tips:
+    post:
+      summary: TODO — создать платёж с чаевыми
+      # TODO: requestBody TipCreate, responses 201 (Payment), 409, 422
+      ?
+
+  /api/v1/payments/{id}/confirm:
+    post:
+      summary: TODO — подтвердить платёж
+      # TODO: responses 200, 402, 409
+      ?
+
+  /api/v1/payments/{id}/cancel:
+    post:
+      summary: TODO — отменить платёж (до подтверждения)
+      # TODO: responses 200, 409
+      ?
+
+  /api/v1/reports/tips:
+    get:
+      summary: TODO — отчёт по чаевым
+      parameters:
+        - {name: merchant_id, in: query, required: true, schema: {type: string}}
+        - {name: from, in: query, required: true, schema: {type: string, format: date}}
+        - {name: to, in: query, required: true, schema: {type: string, format: date}}
+      # TODO: responses 200 (Report), 403
+      ?

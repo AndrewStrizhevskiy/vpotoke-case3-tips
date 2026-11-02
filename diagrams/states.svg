@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="1030" viewBox="0 0 1320 1030" font-family="Inter, 'DejaVu Sans', sans-serif" font-style="normal">
+<rect width="1320" height="1030" fill="#ffffff"/>
+<text x="40" y="58" font-size="26" font-weight="700" fill="#212529">Жизненный цикл платежа</text>
+<text x="40" y="84" font-size="14" fill="#6c757d">кейс 3 · ADR-002 · двойная рамка — финальный статус, красный пунктир — запрещённый переход</text>
+<circle cx="56" cy="325" r="10" fill="#212529"/>
+<rect x="140" y="280" width="200" height="90" rx="14" fill="#e7f0fb" stroke="#3b6fb6" stroke-width="2"/>
+<text x="240.0" y="312" font-size="18" font-weight="700" text-anchor="middle" fill="#3b6fb6">CREATED</text>
+<text x="240.0" y="336" font-size="13" text-anchor="middle" fill="#343a40">суммы зафиксированы</text>
+<text x="240.0" y="354" font-size="13" text-anchor="middle" fill="#343a40">QR заблокирован</text>
+<rect x="520" y="280" width="200" height="90" rx="14" fill="#e7f0fb" stroke="#3b6fb6" stroke-width="2"/>
+<text x="620.0" y="312" font-size="18" font-weight="700" text-anchor="middle" fill="#3b6fb6">PENDING</text>
+<text x="620.0" y="336" font-size="13" text-anchor="middle" fill="#343a40">запрос в шлюзе</text>
+<text x="620.0" y="354" font-size="13" text-anchor="middle" fill="#343a40">QR заблокирован</text>
+<rect x="960" y="110" width="220" height="90" rx="14" fill="#e6f4ea" stroke="#2f7d43" stroke-width="2"/>
+<rect x="965" y="115" width="210" height="80" rx="10" fill="none" stroke="#2f7d43" stroke-width="1.2"/>
+<text x="1070.0" y="142" font-size="18" font-weight="700" text-anchor="middle" fill="#2f7d43">SUCCESS</text>
+<text x="1070.0" y="166" font-size="13" text-anchor="middle" fill="#343a40">деньги списаны</text>
+<text x="1070.0" y="184" font-size="13" text-anchor="middle" fill="#343a40">nonce погашен → QR_USED</text>
+<rect x="960" y="420" width="220" height="90" rx="14" fill="#fdeeee" stroke="#c0392b" stroke-width="2"/>
+<rect x="965" y="425" width="210" height="80" rx="10" fill="none" stroke="#c0392b" stroke-width="1.2"/>
+<text x="1070.0" y="452" font-size="18" font-weight="700" text-anchor="middle" fill="#c0392b">DECLINED</text>
+<text x="1070.0" y="476" font-size="13" text-anchor="middle" fill="#343a40">списания нет</text>
+<text x="1070.0" y="494" font-size="13" text-anchor="middle" fill="#343a40">QR свободен до exp</text>
+<rect x="520" y="580" width="200" height="90" rx="14" fill="#f1f3f5" stroke="#6c757d" stroke-width="2"/>
+<rect x="525" y="585" width="190" height="80" rx="10" fill="none" stroke="#6c757d" stroke-width="1.2"/>
+<text x="620.0" y="612" font-size="18" font-weight="700" text-anchor="middle" fill="#6c757d">CANCELED</text>
+<text x="620.0" y="636" font-size="13" text-anchor="middle" fill="#343a40">до отправки в шлюз</text>
+<text x="620.0" y="654" font-size="13" text-anchor="middle" fill="#343a40">QR свободен до exp</text>
+<polyline points="66,325 140,325" fill="none" stroke="#495057" stroke-width="1.8"/>
+<polygon points="140,325 129.0,329.95 129.0,320.05" fill="#495057"/>
+<rect x="14.0" y="340" width="91.9" height="18" fill="#ffffff"/>
+<text x="60" y="352" font-size="12.5" text-anchor="middle" fill="#495057">④ POST /tips</text>
+<polyline points="340,325 520,325" fill="none" stroke="#495057" stroke-width="1.8"/>
+<polygon points="520,325 509.0,329.95 509.0,320.05" fill="#495057"/>
+<rect x="392.8" y="281" width="74.4" height="34" fill="#ffffff"/>
+<text x="430" y="293" font-size="12.5" text-anchor="middle" fill="#495057">⑤ confirm</text>
+<text x="430" y="309" font-size="12.5" text-anchor="middle" fill="#495057">(client)</text>
+<polyline points="720,300 840,300 840,155 960,155" fill="none" stroke="#495057" stroke-width="1.8"/>
+<polygon points="960,155 949.0,159.95 949.0,150.05" fill="#495057"/>
+<rect x="870.2" y="111" width="59.5" height="34" fill="#ffffff"/>
+<text x="900" y="123" font-size="12.5" text-anchor="middle" fill="#495057">h = 0–7</text>
+<text x="900" y="139" font-size="12.5" text-anchor="middle" fill="#495057">(system)</text>
+<polyline points="720,350 840,350 840,445 960,445" fill="none" stroke="#495057" stroke-width="1.8"/>
+<polygon points="960,445 949.0,449.95 949.0,440.05" fill="#495057"/>
+<rect x="844.9" y="401" width="110.2" height="34" fill="#ffffff"/>
+<text x="900" y="413" font-size="12.5" text-anchor="middle" fill="#495057">h = 8</text>
+<text x="900" y="429" font-size="12.5" text-anchor="middle" fill="#495057">CARD_DECLINED</text>
+<polyline points="680,370 680,490 960,490" fill="none" stroke="#495057" stroke-width="1.8"/>
+<polygon points="960,490 949.0,494.95 949.0,485.05" fill="#495057"/>
+<rect x="734.6" y="500" width="170.8" height="34" fill="#ffffff"/>
+<text x="820" y="512" font-size="12.5" text-anchor="middle" fill="#495057">сверка: 15 мин без ответа,</text>
+<text x="820" y="528" font-size="12.5" text-anchor="middle" fill="#495057">GATEWAY_TIMEOUT</text>
+<polyline points="580,280 580,220 660,220 660,280" fill="none" stroke="#495057" stroke-width="1.8"/>
+<polygon points="660,280 655.05,269.0 664.95,269.0" fill="#495057"/>
+<rect x="533.3" y="174" width="173.3" height="34" fill="#ffffff"/>
+<text x="620" y="186" font-size="12.5" text-anchor="middle" fill="#495057">h = 9: TIMEOUT, ответ 202,</text>
+<text x="620" y="202" font-size="12.5" text-anchor="middle" fill="#495057">ждём сверку</text>
+<polyline points="240,370 240,625 520,625" fill="none" stroke="#495057" stroke-width="1.8"/>
+<polygon points="520,625 509.0,629.95 509.0,620.05" fill="#495057"/>
+<rect x="274.9" y="577" width="210.1" height="34" fill="#ffffff"/>
+<text x="380" y="589" font-size="12.5" text-anchor="middle" fill="#495057">cancel (client) или</text>
+<text x="380" y="605" font-size="12.5" text-anchor="middle" fill="#495057">exp / 15 мин без confirm (system)</text>
+<polyline points="620,370 620,580" fill="none" stroke="#c0392b" stroke-width="1.8" stroke-dasharray="7 5"/>
+<polygon points="620,580 615.05,569.0 624.95,569.0" fill="#c0392b"/>
+<circle cx="620.0" cy="475.0" r="11" fill="#ffffff" stroke="#c0392b" stroke-width="1.8"/>
+<path d="M615.0,470.0 L625.0,480.0 M625.0,470.0 L615.0,480.0" stroke="#c0392b" stroke-width="2"/>
+<rect x="452.8" y="523" width="157.2" height="34" fill="#ffffff"/>
+<text x="606" y="535" font-size="12.5" text-anchor="end" fill="#c0392b">409</text>
+<text x="606" y="551" font-size="12.5" text-anchor="end" fill="#c0392b">CANCEL_NOT_ALLOWED</text>
+<polyline points="1180,155 1260,155 1260,650 720,650" fill="none" stroke="#c0392b" stroke-width="1.8" stroke-dasharray="7 5"/>
+<polygon points="720,650 731.0,645.05 731.0,654.95" fill="#c0392b"/>
+<circle cx="990.0" cy="650.0" r="11" fill="#ffffff" stroke="#c0392b" stroke-width="1.8"/>
+<path d="M985.0,645.0 L995.0,655.0 M995.0,645.0 L985.0,655.0" stroke="#c0392b" stroke-width="2"/>
+<rect x="819.0" y="614" width="341.9" height="18" fill="#ffffff"/>
+<text x="990" y="626" font-size="12.5" text-anchor="middle" fill="#c0392b">409 CANCEL_NOT_ALLOWED: возвратов в проекте нет</text>
+<rect x="40" y="690" width="1240" height="310" rx="10" fill="#fafafa" stroke="#ced4da"/>
+<text x="60" y="720" font-size="13.5" font-weight="700" fill="#212529">Переход</text>
+<text x="260" y="720" font-size="13.5" font-weight="700" fill="#212529">Триггер</text>
+<text x="560" y="720" font-size="13.5" font-weight="700" fill="#212529">actor</text>
+<text x="690" y="720" font-size="13.5" font-weight="700" fill="#212529">Событие аудита</text>
+<text x="900" y="720" font-size="13.5" font-weight="700" fill="#212529">Ответ</text>
+<line x1="56" y1="731" x2="1264" y2="731" stroke="#e9ecef"/>
+<text x="60" y="750" font-size="13" fill="#343a40">— → CREATED</text>
+<text x="260" y="750" font-size="13" fill="#343a40">POST /tips, проверки Q и P пройдены</text>
+<text x="560" y="750" font-size="13" fill="#343a40">client</text>
+<text x="690" y="750" font-size="13" fill="#343a40">payment_created</text>
+<text x="900" y="750" font-size="13" fill="#343a40">201 (повтор ключа: 200)</text>
+<line x1="56" y1="759" x2="1264" y2="759" stroke="#e9ecef"/>
+<text x="60" y="778" font-size="13" fill="#343a40">CREATED → PENDING</text>
+<text x="260" y="778" font-size="13" fill="#343a40">POST /payments/{id}/confirm</text>
+<text x="560" y="778" font-size="13" fill="#343a40">client</text>
+<text x="690" y="778" font-size="13" fill="#343a40">payment_submitted</text>
+<text x="900" y="778" font-size="13" fill="#343a40">—</text>
+<line x1="56" y1="787" x2="1264" y2="787" stroke="#e9ecef"/>
+<text x="60" y="806" font-size="13" fill="#343a40">PENDING → SUCCESS</text>
+<text x="260" y="806" font-size="13" fill="#343a40">эмулятор: h = 0–7</text>
+<text x="560" y="806" font-size="13" fill="#343a40">system</text>
+<text x="690" y="806" font-size="13" fill="#343a40">payment_confirmed</text>
+<text x="900" y="806" font-size="13" fill="#343a40">200</text>
+<line x1="56" y1="815" x2="1264" y2="815" stroke="#e9ecef"/>
+<text x="60" y="834" font-size="13" fill="#343a40">PENDING → DECLINED</text>
+<text x="260" y="834" font-size="13" fill="#343a40">эмулятор: h = 8</text>
+<text x="560" y="834" font-size="13" fill="#343a40">system</text>
+<text x="690" y="834" font-size="13" fill="#343a40">payment_declined</text>
+<text x="900" y="834" font-size="13" fill="#343a40">402 CARD_DECLINED</text>
+<line x1="56" y1="843" x2="1264" y2="843" stroke="#e9ecef"/>
+<text x="60" y="862" font-size="13" fill="#343a40">PENDING → PENDING</text>
+<text x="260" y="862" font-size="13" fill="#343a40">эмулятор: h = 9</text>
+<text x="560" y="862" font-size="13" fill="#343a40">system</text>
+<text x="690" y="862" font-size="13" fill="#343a40">— (статус не меняется)</text>
+<text x="900" y="862" font-size="13" fill="#343a40">202 GATEWAY_TIMEOUT</text>
+<line x1="56" y1="871" x2="1264" y2="871" stroke="#e9ecef"/>
+<text x="60" y="890" font-size="13" fill="#343a40">PENDING → DECLINED</text>
+<text x="260" y="890" font-size="13" fill="#343a40">сверка: 15 мин без ответа</text>
+<text x="560" y="890" font-size="13" fill="#343a40">system</text>
+<text x="690" y="890" font-size="13" fill="#343a40">payment_declined</text>
+<text x="900" y="890" font-size="13" fill="#343a40">— (фоновый процесс)</text>
+<line x1="56" y1="899" x2="1264" y2="899" stroke="#e9ecef"/>
+<text x="60" y="918" font-size="13" fill="#343a40">CREATED → CANCELED</text>
+<text x="260" y="918" font-size="13" fill="#343a40">cancel или истёк exp / 15 мин</text>
+<text x="560" y="918" font-size="13" fill="#343a40">client / system</text>
+<text x="690" y="918" font-size="13" fill="#343a40">payment_canceled</text>
+<text x="900" y="918" font-size="13" fill="#343a40">200</text>
+<line x1="56" y1="927" x2="1264" y2="927" stroke="#e9ecef"/>
+<text x="60" y="946" font-size="13" fill="#c0392b">PENDING → CANCELED</text>
+<text x="260" y="946" font-size="13" fill="#c0392b">cancel</text>
+<text x="560" y="946" font-size="13" fill="#c0392b">—</text>
+<text x="690" y="946" font-size="13" fill="#c0392b">—</text>
+<text x="900" y="946" font-size="13" fill="#c0392b">409 CANCEL_NOT_ALLOWED</text>
+<line x1="56" y1="955" x2="1264" y2="955" stroke="#e9ecef"/>
+<text x="60" y="974" font-size="13" fill="#c0392b">SUCCESS → CANCELED</text>
+<text x="260" y="974" font-size="13" fill="#c0392b">cancel</text>
+<text x="560" y="974" font-size="13" fill="#c0392b">—</text>
+<text x="690" y="974" font-size="13" fill="#c0392b">—</text>
+<text x="900" y="974" font-size="13" fill="#c0392b">409 CANCEL_NOT_ALLOWED</text>
+</svg>

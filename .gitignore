@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.*
+prototype/payments_out.csv
+prototype/audit_out.csv
+*.part
+.~lock.*

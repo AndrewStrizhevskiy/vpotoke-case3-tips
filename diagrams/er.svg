@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="900" viewBox="0 0 1560 900" font-family="Inter, 'DejaVu Sans', sans-serif" font-style="normal">
+<rect width="1560" height="900" fill="#ffffff"/>
+<text x="40" y="50" font-size="26" font-weight="700" fill="#212529">ER-модель</text>
+<text x="200" y="50" font-size="14" fill="#6c757d">кейс 3 · ADR-005 · PK — первичный ключ, FK — внешний, UK — уникальный</text>
+<polyline points="210,256 210,420" fill="none" stroke="#495057" stroke-width="1.6"/>
+<polygon points="210,420 205.95,411.0 214.05,411.0" fill="#495057"/>
+<text x="222" y="276" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">1</text>
+<text x="222" y="410" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">N</text>
+<rect x="217.7" y="328" width="64.5" height="17" fill="#ffffff"/>
+<text x="250" y="340" font-size="12" text-anchor="middle" fill="#6c757d">работают</text>
+<polyline points="360,170 440,170" fill="none" stroke="#495057" stroke-width="1.6"/>
+<polygon points="440,170 431.0,174.05 431.0,165.95" fill="#495057"/>
+<text x="368" y="162" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">1</text>
+<text x="426" y="162" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">N</text>
+<polyline points="360,230 400,230 400,480 440,480" fill="none" stroke="#495057" stroke-width="1.6"/>
+<polygon points="440,480 431.0,484.05 431.0,475.95" fill="#495057"/>
+<text x="368" y="222" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">1</text>
+<text x="426" y="472" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">N</text>
+<polyline points="590,256 590,420" fill="none" stroke="#495057" stroke-width="1.6"/>
+<polygon points="590,420 585.95,411.0 594.05,411.0" fill="#495057"/>
+<text x="602" y="276" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">1</text>
+<text x="602" y="410" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">N</text>
+<rect x="589.4" y="328" width="141.2" height="17" fill="#ffffff"/>
+<text x="660" y="340" font-size="12" text-anchor="middle" fill="#6c757d">перевыпуск после exp</text>
+<polyline points="360,560 440,560" fill="none" stroke="#495057" stroke-width="1.6"/>
+<polygon points="440,560 431.0,564.05 431.0,555.95" fill="#495057"/>
+<text x="368" y="552" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">1</text>
+<text x="426" y="552" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">N</text>
+<polyline points="740,520 820,520" fill="none" stroke="#495057" stroke-width="1.6"/>
+<polygon points="820,520 811.0,524.05 811.0,515.95" fill="#495057"/>
+<text x="748" y="512" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">1</text>
+<text x="806" y="512" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">N</text>
+<rect x="751.2" y="528" width="57.5" height="17" fill="#ffffff"/>
+<text x="780" y="540" font-size="12" text-anchor="middle" fill="#6c757d">попытки</text>
+<polyline points="1120,520 1200,520" fill="none" stroke="#495057" stroke-width="1.6"/>
+<polygon points="1200,520 1191.0,524.05 1191.0,515.95" fill="#495057"/>
+<text x="1128" y="512" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">1</text>
+<text x="1186" y="512" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">N</text>
+<rect x="1127.0" y="528" width="66.0" height="17" fill="#ffffff"/>
+<text x="1160" y="540" font-size="12" text-anchor="middle" fill="#6c757d">переходы</text>
+<polyline points="110,120 110,100 1350,100 1350,120" fill="none" stroke="#495057" stroke-width="1.6"/>
+<polygon points="1350,120 1345.95,111.0 1354.05,111.0" fill="#495057"/>
+<text x="98" y="114" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">1</text>
+<text x="1362" y="114" font-size="14" font-weight="700" text-anchor="middle" fill="#212529">N</text>
+<rect x="708.5" y="80" width="103.0" height="17" fill="#ffffff"/>
+<text x="760" y="92" font-size="12" text-anchor="middle" fill="#6c757d">отчёт за период</text>
+<rect x="60" y="120" width="300" height="136" rx="8" fill="#ffffff" stroke="#3d8b4f" stroke-width="2"/>
+<path d="M60,158 H360" stroke="#3d8b4f" stroke-width="1.2"/>
+<text x="72" y="145" font-size="16" font-weight="700" fill="#3d8b4f">Merchant</text>
+<text x="70" y="176" font-size="10.5" font-weight="700" fill="#b8860b">PK</text>
+<text x="112" y="176" font-size="13" font-weight="700" fill="#212529">merchant_id</text>
+<text x="350" y="176" font-size="11.5" text-anchor="end" fill="#6c757d">m_NNN</text>
+<text x="112" y="198" font-size="13" font-weight="400" fill="#212529">name</text>
+<text x="350" y="198" font-size="11.5" text-anchor="end" fill="#6c757d">1–100</text>
+<text x="112" y="220" font-size="13" font-weight="400" fill="#212529">status</text>
+<text x="350" y="220" font-size="11.5" text-anchor="end" fill="#6c757d">ACTIVE / BLOCKED / PENDING</text>
+<text x="112" y="242" font-size="13" font-weight="400" fill="#212529">description</text>
+<text x="350" y="242" font-size="11.5" text-anchor="end" fill="#6c757d">0–200, необяз.</text>
+<rect x="440" y="120" width="300" height="136" rx="8" fill="#ffffff" stroke="#868e96" stroke-width="2" stroke-dasharray="7 5"/>
+<path d="M440,158 H740" stroke="#868e96" stroke-width="1.2" stroke-dasharray="7 5"/>
+<text x="452" y="145" font-size="16" font-weight="700" fill="#868e96">Receipt (реестр POS)</text>
+<text x="450" y="176" font-size="10.5" font-weight="700" fill="#b8860b">PK</text>
+<text x="492" y="176" font-size="13" font-weight="700" fill="#212529">receipt_id</text>
+<text x="730" y="176" font-size="11.5" text-anchor="end" fill="#6c757d">r_NNNN</text>
+<text x="450" y="198" font-size="10.5" font-weight="700" fill="#b8860b">PK FK</text>
+<text x="492" y="198" font-size="13" font-weight="700" fill="#212529">merchant_id</text>
+<text x="730" y="198" font-size="11.5" text-anchor="end" fill="#6c757d">→ Merchant</text>
+<text x="492" y="220" font-size="13" font-weight="400" fill="#212529">amount</text>
+<text x="730" y="220" font-size="11.5" text-anchor="end" fill="#6c757d">decimal, 0 &lt; x ≤ 1 000 000</text>
+<text x="492" y="242" font-size="13" font-weight="400" fill="#212529">currency</text>
+<text x="730" y="242" font-size="11.5" text-anchor="end" fill="#6c757d">RUB</text>
+<rect x="1200" y="120" width="300" height="202" rx="8" fill="#ffffff" stroke="#7048a8" stroke-width="2"/>
+<path d="M1200,158 H1500" stroke="#7048a8" stroke-width="1.2"/>
+<text x="1212" y="145" font-size="16" font-weight="700" fill="#7048a8">Report</text>
+<text x="1210" y="176" font-size="10.5" font-weight="700" fill="#b8860b">PK</text>
+<text x="1252" y="176" font-size="13" font-weight="700" fill="#212529">report_id</text>
+<text x="1490" y="176" font-size="11.5" text-anchor="end" fill="#6c757d">rep_NNNN</text>
+<text x="1210" y="198" font-size="10.5" font-weight="700" fill="#3b6fb6">FK</text>
+<text x="1252" y="198" font-size="13" font-weight="400" fill="#212529">merchant_id</text>
+<text x="1490" y="198" font-size="11.5" text-anchor="end" fill="#6c757d">→ Merchant</text>
+<text x="1252" y="220" font-size="13" font-weight="400" fill="#212529">period</text>
+<text x="1490" y="220" font-size="11.5" text-anchor="end" fill="#6c757d">YYYY-MM</text>
+<text x="1252" y="242" font-size="13" font-weight="400" fill="#212529">tips_total</text>
+<text x="1490" y="242" font-size="11.5" text-anchor="end" fill="#6c757d">≥ 0, по SUCCESS</text>
+<text x="1252" y="264" font-size="13" font-weight="400" fill="#212529">payments_count</text>
+<text x="1490" y="264" font-size="11.5" text-anchor="end" fill="#6c757d">≥ 0</text>
+<text x="1252" y="286" font-size="13" font-weight="400" fill="#212529">avg_tip_pct</text>
+<text x="1490" y="286" font-size="11.5" text-anchor="end" fill="#6c757d">0–50</text>
+<text x="1252" y="308" font-size="13" font-weight="400" fill="#212529">success_rate</text>
+<text x="1490" y="308" font-size="11.5" text-anchor="end" fill="#6c757d">0–1</text>
+<rect x="60" y="420" width="300" height="136" rx="8" fill="#ffffff" stroke="#3d8b4f" stroke-width="2"/>
+<path d="M60,458 H360" stroke="#3d8b4f" stroke-width="1.2"/>
+<text x="72" y="445" font-size="16" font-weight="700" fill="#3d8b4f">Employee</text>
+<text x="70" y="476" font-size="10.5" font-weight="700" fill="#b8860b">PK</text>
+<text x="112" y="476" font-size="13" font-weight="700" fill="#212529">employee_id</text>
+<text x="350" y="476" font-size="11.5" text-anchor="end" fill="#6c757d">e_NNN</text>
+<text x="70" y="498" font-size="10.5" font-weight="700" fill="#3b6fb6">FK</text>
+<text x="112" y="498" font-size="13" font-weight="400" fill="#212529">merchant_id</text>
+<text x="350" y="498" font-size="11.5" text-anchor="end" fill="#6c757d">→ Merchant</text>
+<text x="112" y="520" font-size="13" font-weight="400" fill="#212529">name</text>
+<text x="350" y="520" font-size="11.5" text-anchor="end" fill="#6c757d">1–100</text>
+<text x="112" y="542" font-size="13" font-weight="400" fill="#212529">payment_details</text>
+<text x="350" y="542" font-size="11.5" text-anchor="end" fill="#6c757d">только ****NNNN</text>
+<rect x="440" y="420" width="300" height="202" rx="8" fill="#ffffff" stroke="#3b6fb6" stroke-width="2"/>
+<path d="M440,458 H740" stroke="#3b6fb6" stroke-width="1.2"/>
+<text x="452" y="445" font-size="16" font-weight="700" fill="#3b6fb6">QR</text>
+<text x="450" y="476" font-size="10.5" font-weight="700" fill="#b8860b">PK</text>
+<text x="492" y="476" font-size="13" font-weight="700" fill="#212529">qr_id</text>
+<text x="730" y="476" font-size="11.5" text-anchor="end" fill="#6c757d">qr_NNN</text>
+<text x="450" y="498" font-size="10.5" font-weight="700" fill="#3b6fb6">FK</text>
+<text x="492" y="498" font-size="13" font-weight="400" fill="#212529">merchant_id</text>
+<text x="730" y="498" font-size="11.5" text-anchor="end" fill="#6c757d">→ Merchant</text>
+<text x="450" y="520" font-size="10.5" font-weight="700" fill="#3b6fb6">FK</text>
+<text x="492" y="520" font-size="13" font-weight="400" fill="#212529">employee_id</text>
+<text x="730" y="520" font-size="11.5" text-anchor="end" fill="#6c757d">→ Employee</text>
+<text x="450" y="542" font-size="10.5" font-weight="700" fill="#3b6fb6">FK</text>
+<text x="492" y="542" font-size="13" font-weight="400" fill="#212529">receipt_id</text>
+<text x="730" y="542" font-size="11.5" text-anchor="end" fill="#6c757d">→ Receipt</text>
+<text x="450" y="564" font-size="10.5" font-weight="700" fill="#7048a8">UK</text>
+<text x="492" y="564" font-size="13" font-weight="400" fill="#212529">nonce</text>
+<text x="730" y="564" font-size="11.5" text-anchor="end" fill="#6c757d">6 hex, одноразовый</text>
+<text x="492" y="586" font-size="13" font-weight="400" fill="#212529">exp</text>
+<text x="730" y="586" font-size="11.5" text-anchor="end" fill="#6c757d">ISO 8601, ≤ +24 ч</text>
+<text x="492" y="608" font-size="13" font-weight="400" fill="#212529">signature</text>
+<text x="730" y="608" font-size="11.5" text-anchor="end" fill="#6c757d">HMAC-SHA256, 16 hex</text>
+<rect x="820" y="420" width="300" height="290" rx="8" fill="#ffffff" stroke="#d9822b" stroke-width="2"/>
+<path d="M820,458 H1120" stroke="#d9822b" stroke-width="1.2"/>
+<text x="832" y="445" font-size="16" font-weight="700" fill="#d9822b">Payment</text>
+<text x="830" y="476" font-size="10.5" font-weight="700" fill="#b8860b">PK</text>
+<text x="872" y="476" font-size="13" font-weight="700" fill="#212529">payment_id</text>
+<text x="1110" y="476" font-size="11.5" text-anchor="end" fill="#6c757d">p_NNNN</text>
+<text x="830" y="498" font-size="10.5" font-weight="700" fill="#3b6fb6">FK</text>
+<text x="872" y="498" font-size="13" font-weight="400" fill="#212529">qr_id</text>
+<text x="1110" y="498" font-size="11.5" text-anchor="end" fill="#6c757d">→ QR</text>
+<text x="830" y="520" font-size="10.5" font-weight="700" fill="#3b6fb6">FK</text>
+<text x="872" y="520" font-size="13" font-weight="400" fill="#212529">merchant_id</text>
+<text x="1110" y="520" font-size="11.5" text-anchor="end" fill="#6c757d">денорм., отчёты</text>
+<text x="830" y="542" font-size="10.5" font-weight="700" fill="#3b6fb6">FK</text>
+<text x="872" y="542" font-size="13" font-weight="400" fill="#212529">employee_id</text>
+<text x="1110" y="542" font-size="11.5" text-anchor="end" fill="#6c757d">денорм., отчёты</text>
+<text x="872" y="564" font-size="13" font-weight="400" fill="#212529">amount</text>
+<text x="1110" y="564" font-size="11.5" text-anchor="end" fill="#6c757d">0 &lt; x ≤ 1 000 000</text>
+<text x="872" y="586" font-size="13" font-weight="400" fill="#212529">tip</text>
+<text x="1110" y="586" font-size="11.5" text-anchor="end" fill="#6c757d">0 ≤ x ≤ amount × 0.5</text>
+<text x="872" y="608" font-size="13" font-weight="400" fill="#212529">amount_total</text>
+<text x="1110" y="608" font-size="11.5" text-anchor="end" fill="#6c757d">amount + tip</text>
+<text x="872" y="630" font-size="13" font-weight="400" fill="#212529">status</text>
+<text x="1110" y="630" font-size="11.5" text-anchor="end" fill="#6c757d">5 статусов</text>
+<text x="830" y="652" font-size="10.5" font-weight="700" fill="#7048a8">UK</text>
+<text x="872" y="652" font-size="13" font-weight="400" fill="#212529">idempotency_key</text>
+<text x="1110" y="652" font-size="11.5" text-anchor="end" fill="#6c757d">UUID, уник. в qr_id</text>
+<text x="872" y="674" font-size="13" font-weight="400" fill="#212529">error_code</text>
+<text x="1110" y="674" font-size="11.5" text-anchor="end" fill="#6c757d">необяз.</text>
+<text x="872" y="696" font-size="13" font-weight="400" fill="#212529">timestamp</text>
+<text x="1110" y="696" font-size="11.5" text-anchor="end" fill="#6c757d">ISO 8601, UTC</text>
+<rect x="1200" y="420" width="300" height="246" rx="8" fill="#ffffff" stroke="#c0392b" stroke-width="2"/>
+<path d="M1200,458 H1500" stroke="#c0392b" stroke-width="1.2"/>
+<text x="1212" y="445" font-size="16" font-weight="700" fill="#c0392b">AuditEvent</text>
+<text x="1210" y="476" font-size="10.5" font-weight="700" fill="#b8860b">PK</text>
+<text x="1252" y="476" font-size="13" font-weight="700" fill="#212529">event_id</text>
+<text x="1490" y="476" font-size="11.5" text-anchor="end" fill="#6c757d">evt_NNNN</text>
+<text x="1210" y="498" font-size="10.5" font-weight="700" fill="#3b6fb6">FK</text>
+<text x="1252" y="498" font-size="13" font-weight="400" fill="#212529">payment_id</text>
+<text x="1490" y="498" font-size="11.5" text-anchor="end" fill="#6c757d">→ Payment</text>
+<text x="1210" y="520" font-size="10.5" font-weight="700" fill="#3b6fb6">FK</text>
+<text x="1252" y="520" font-size="13" font-weight="400" fill="#212529">qr_id</text>
+<text x="1490" y="520" font-size="11.5" text-anchor="end" fill="#6c757d">денорм.</text>
+<text x="1252" y="542" font-size="13" font-weight="400" fill="#212529">action</text>
+<text x="1490" y="542" font-size="11.5" text-anchor="end" fill="#6c757d">payment_created…</text>
+<text x="1252" y="564" font-size="13" font-weight="400" fill="#212529">from_status</text>
+<text x="1490" y="564" font-size="11.5" text-anchor="end" fill="#6c757d">статус или null</text>
+<text x="1252" y="586" font-size="13" font-weight="400" fill="#212529">to_status</text>
+<text x="1490" y="586" font-size="11.5" text-anchor="end" fill="#6c757d">статус</text>
+<text x="1252" y="608" font-size="13" font-weight="400" fill="#212529">amount_total</text>
+<text x="1490" y="608" font-size="11.5" text-anchor="end" fill="#6c757d">decimal</text>
+<text x="1252" y="630" font-size="13" font-weight="400" fill="#212529">actor</text>
+<text x="1490" y="630" font-size="11.5" text-anchor="end" fill="#6c757d">client / system / officer</text>
+<text x="1252" y="652" font-size="13" font-weight="400" fill="#212529">at</text>
+<text x="1490" y="652" font-size="11.5" text-anchor="end" fill="#6c757d">ISO 8601, UTC</text>
+<rect x="40" y="760" width="1480" height="100" rx="10" fill="#fafafa" stroke="#ced4da"/>
+<text x="58" y="790" font-size="14" fill="#343a40">Связи 1:N. Подписи у концов линий: 1 — сторона «один», N — сторона «много».</text>
+<text x="58" y="816" font-size="14" fill="#343a40">Payment.merchant_id / employee_id и AuditEvent.qr_id — денормализация ради отчётов, отдельными линиями не показаны.</text>
+<text x="58" y="842" font-size="14" fill="#343a40">Инвариант: QR.merchant_id = Employee.merchant_id = Receipt.merchant_id. Receipt — внешний реестр кассы (пунктир, ADR-003).</text>
+</svg>
