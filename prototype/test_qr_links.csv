@@ -1,0 +1,2 @@
+qr_id,merchant_id,employee_id,receipt_id,nonce,exp,signature
+qr_101,m_019,e_055,r_1101,d4e5f6,2025-11-01T23:59:00Z,2185d63126f7da25
