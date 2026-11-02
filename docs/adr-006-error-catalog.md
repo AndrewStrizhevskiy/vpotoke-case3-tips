@@ -23,7 +23,7 @@
 | `tip_pct > 50` или `tip_amount > base × 0.5` | TIP_OUT_OF_RANGE | 422 | да (исправить чаевые) |
 | `base_amount ≤ 0` или `> 1 000 000` | AMOUNT_OUT_OF_RANGE | 422 | нет |
 | `amount_total > 2 000 000` | AMOUNT_OUT_OF_RANGE | 422 | нет |
-| Тот же `idempotency_key` и то же тело запроса | — (вернуть существующий платёж) | 200 | — |
+| Тот же `idempotency_key` и то же тело запроса (в том числе после SUCCESS или истечения QR) | — (вернуть существующий платёж) | 200 | — |
 | Тот же `idempotency_key`, другое тело | IDEMPOTENCY_CONFLICT | 409 | нет |
 | По QR уже есть платёж в CREATED или PENDING | PAYMENT_IN_PROGRESS | 409 | да (дождаться итога) |
 | Эмулятор вернул 8 | CARD_DECLINED | 402 | да (другой способ оплаты) |
@@ -32,7 +32,10 @@
 | Отмена из CREATED | — | 200, статус CANCELED | — |
 | Отмена из PENDING | CANCEL_NOT_ALLOWED | 409 | нет |
 | Отмена из SUCCESS | CANCEL_NOT_ALLOWED | 409 | нет |
-| confirm или cancel для платежа в финальном статусе | PAYMENT_STATE_CONFLICT | 409 | нет |
+| Отмена из DECLINED | CANCEL_NOT_ALLOWED | 409 | нет |
+| Повторная отмена CANCELED | — | 200, статус CANCELED | — |
+| Повторный confirm (PENDING / SUCCESS / DECLINED) | — (текущий статус, шлюз не вызывается) | 202 / 200 / 402 | — |
+| confirm для CANCELED | PAYMENT_STATE_CONFLICT | 409 | нет |
 | QR или платёж не найден (запрос с верной подписью) | NOT_FOUND | 404 | нет |
 | Неверный формат запроса | VALIDATION_ERROR | 400 | нет |
 | Нет прав (RBAC), например чужой отчёт | ACCESS_DENIED | 403 | нет |

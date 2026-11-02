@@ -20,7 +20,9 @@
 
 1. **Вход** — JSON: `{"qr_id", "sig", "base_amount", "tip_pct" | "tip_amount", "idempotency_key"}`.
    `sig` — подпись из ссылки (ADR-003): проверяй и её, и подпись записи в `qr_links.csv`.
-2. **Порядок проверок** — строго по ADR-004: подпись → exp → nonce → мерчант → чек → суммы.
+2. **Порядок проверок** — строго по ADR-004: подпись → поиск по `idempotency_key` → exp → nonce →
+   мерчант → чек → суммы. Ключ ищется до проверки nonce, иначе повтор после оплаты получит QR_USED.
+   Повторные `confirm` и `cancel` отвечают по таблице в ADR-002.
 3. **Сумма чека.** Реестр чеков для прототипа строится из `payments.csv`: `p_000N ↔ qr_00N`, `amount` = сумма чека.
    Несовпадение `base_amount` с реестром → `AMOUNT_MISMATCH`.
 4. **Выход** — JSON с `payment_id`, `status`, `tip_amount`, `amount_total`, `error_code`.
@@ -47,7 +49,9 @@ Seed-данные трогать нельзя. Для теста T3-7 нужен
 | T3-6 Таймаут (доп.) | qr_010 | PENDING, GATEWAY_TIMEOUT |
 | T3-7 Блокировка (доп.) | QR мерчанта m_019 | MERCHANT_BLOCKED |
 | T3-8 Чаевые > 50 % (доп.) | qr_001, `tip_pct` 51 | TIP_OUT_OF_RANGE |
-| T3-9 Повторная оплата (доп.) | qr_001 после T3-1 | QR_USED |
+| T3-9 Повторная оплата (доп.) | qr_001 после T3-1, **новый** `idempotency_key` | QR_USED |
+| T3-4б Повтор после оплаты (доп.) | qr_001 после T3-1, **тот же** `idempotency_key` | 200, тот же `payment_id`, не QR_USED |
+| T3-5б Повторные действия (доп.) | повторный `confirm` после SUCCESS; `confirm` после `cancel`; повторный `cancel` | 200 без вызова шлюза; PAYMENT_STATE_CONFLICT; 200 CANCELED |
 
 Перед каждым прогоном удаляй `payments_out.csv` и `audit_out.csv`, иначе T3-4 и T3-9 дадут ложный результат.
 Хорошо бы обернуть всё в `prototype/run_tests.sh` или pytest, чтобы «Факт» в 03_тесты получался одной командой.

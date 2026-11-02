@@ -33,12 +33,12 @@
 | Шаг | Что проверяется / делается | При ошибке |
 |-|-|-|
 | 1. Валидация | формат id (`qr_NNN`, `r_NNNN`), типы, обязательные поля, ровно одно из `tip_pct` / `tip_amount`, UUID ключа | 400 `VALIDATION_ERROR`, платёж не создаётся |
-| 2. Проверка QR | Q-1 подпись (`compare_digest`) → Q-2 `exp ≥ now` → Q-3 по QR нет SUCCESS → Q-4 мерчант ACTIVE → Q-5 `receipt_id` совпадает с QR | 422 `INVALID_QR` / 410 `QR_EXPIRED` / 409 `QR_USED` / 403 `MERCHANT_BLOCKED` / 422 `RECEIPT_MISMATCH` |
+| 2. Проверка QR и повтор | Q-1 подпись (`compare_digest`) → P-2 поиск по `idempotency_key`: найден — вернуть его платёж (200) или `IDEMPOTENCY_CONFLICT` (409) → Q-2 `exp ≥ now` → Q-3 по QR нет SUCCESS → Q-4 мерчант ACTIVE → Q-5 `receipt_id` совпадает с QR | 422 `INVALID_QR` / 410 `QR_EXPIRED` / 409 `QR_USED` / 403 `MERCHANT_BLOCKED` / 422 `RECEIPT_MISMATCH` |
 | 3. Расчёт суммы | `base_amount` = сумма из реестра чеков → P-1 диапазон чека → Q-6 диапазон чаевых → расчёт в `Decimal` → P-3 итог ≤ 2 000 000 | 422 `AMOUNT_MISMATCH` / `AMOUNT_OUT_OF_RANGE` / `TIP_OUT_OF_RANGE` |
-| 4. Создание | P-2: ключ уже есть → вернуть существующий платёж; по QR есть CREATED/PENDING → отказ; иначе атомарно записать ключ + платёж CREATED + событие аудита | 200 (повтор) / 409 `IDEMPOTENCY_CONFLICT` / 409 `PAYMENT_IN_PROGRESS` |
-| 5. Подтверждение | `confirm_token` верен, статус CREATED → PENDING, вызов эмулятора | 404 / 409 `PAYMENT_STATE_CONFLICT`; повторный confirm возвращает текущий статус без нового вызова шлюза |
+| 4. Создание | по QR есть CREATED/PENDING → отказ; иначе атомарно записать ключ + платёж CREATED + событие аудита | 409 `PAYMENT_IN_PROGRESS` |
+| 5. Подтверждение | `confirm_token` верен, статус CREATED → PENDING, вызов эмулятора | 404; повторный confirm возвращает текущий статус с прежним кодом (202 / 200 / 402) без вызова шлюза; confirm для CANCELED → 409 `PAYMENT_STATE_CONFLICT` |
 | 6. Результат | таблица сценариев, затем `h`: 0–7 SUCCESS, 8 DECLINED, 9 PENDING | 402 `CARD_DECLINED` / 202 `GATEWAY_TIMEOUT` (опрос `GET /payments/{id}`) |
-| 7. Отмена | только из CREATED (P-4) | 409 `CANCEL_NOT_ALLOWED` из PENDING и SUCCESS |
+| 7. Отмена | только из CREATED (P-4) | 409 `CANCEL_NOT_ALLOWED` из PENDING, SUCCESS и DECLINED; повторная отмена CANCELED → 200 |
 | 8. Аудит | событие на каждый переход, в одной транзакции с ним; журнал только дописывается | если событие не записалось, откатывается и переход |
 
 ## 4. Формулы
@@ -105,7 +105,7 @@ Payload: `m_001|e_003|r_1003|4443ae|2025-11-01T23:59:00Z` → подпись `e4
 | отмена из PENDING | CANCEL_NOT_ALLOWED | 409 | нет |
 | отмена из SUCCESS | CANCEL_NOT_ALLOWED | 409 | нет |
 
-Полный каталог (23 ситуации) — ADR-006.
+Полный каталог (26 ситуаций) — ADR-006.
 
 ## 8. Идемпотентность
 
@@ -114,6 +114,8 @@ Payload: `m_001|e_003|r_1003|4443ae|2025-11-01T23:59:00Z` → подпись `e4
 - **Тот же ключ и то же тело запроса** → HTTP **200**, возвращается **тот же** `payment_id` в текущем статусе.
   Шлюз повторно не вызывается, новая строка не пишется.
 - **Тот же ключ, другое тело** (например, другой `tip_pct`) → 409 `IDEMPOTENCY_CONFLICT`.
+- **Ключ ищется сразу после проверки подписи**, раньше проверок срока и nonce. Поэтому повтор
+  после SUCCESS или после истечения QR тоже получает 200 и свой платёж, а не `QR_USED` или `QR_EXPIRED`.
 - **Строки в CSV:** `payments.csv` — seed, не меняется (100 строк, контроль `md5sum`).
   В `payments_out.csv` на один ключ приходится **ровно одна** строка, сколько бы раз запрос ни повторили.
 - Запись ключа и платежа атомарна (уникальный индекс `(qr_id, idempotency_key)`),
