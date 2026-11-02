@@ -97,6 +97,33 @@ def t4():
     return ok, f"{first['payment_id']} и {second['payment_id']}, строк: {len(e.rows())}"
 
 
+def t4b():
+    e = Env()
+    req = e.req(qr_id="qr_001", sig=sig_of("qr_001"), base_amount=637.00, tip_pct=5, idempotency_key="k-4b")
+    e.run(req)
+    code, again = e.run(req)
+    ok = code == 0 and again["status"] == "SUCCESS" and again["payment_id"] == "p_0101" and len(e.rows()) == 1
+    return ok, f"код {code}, {again.get('status')}, {again.get('payment_id')}, строк: {len(e.rows())}"
+
+
+def t5b():
+    e = Env()
+    e.run(e.req(qr_id="qr_001", sig=sig_of("qr_001"), base_amount=637.00, tip_pct=5, idempotency_key="k-5b1"))
+    events = len(open(os.path.join(e.dir, "audit_out.csv"), encoding="utf-8").readlines())
+    code1, c1 = e.run("confirm", "p_0101")  # повторный confirm после SUCCESS
+    events_after = len(open(os.path.join(e.dir, "audit_out.csv"), encoding="utf-8").readlines())
+    e.run("create", e.req(qr_id="qr_003", sig=sig_of("qr_003"), base_amount=911.00, tip_pct=15,
+                          idempotency_key="k-5b2"))
+    e.run("cancel", "p_0102")
+    code2, c2 = e.run("confirm", "p_0102")  # confirm после cancel
+    code3, c3 = e.run("cancel", "p_0102")  # повторный cancel
+    ok = (code1 == 0 and c1["status"] == "SUCCESS" and events == events_after
+          and code2 == 2 and c2["error_code"] == "PAYMENT_STATE_CONFLICT"
+          and code3 == 0 and c3["status"] == "CANCELED")
+    return ok, (f"confirm после SUCCESS: {c1['status']} без нового аудита; confirm после cancel: "
+                f"{c2['error_code']}; повторный cancel: {c3['status']}")
+
+
 def t5():
     e = Env()
     _, created = e.run("create", e.req(qr_id="qr_001", sig=sig_of("qr_001"), base_amount=637.00,
@@ -154,7 +181,7 @@ def t9():
 
 
 TESTS = [("T3-1 Успех", t1), ("T3-2 Отказ", t2), ("T3-3 Неверный QR", t3), ("T3-3б QR истёк", t3b),
-         ("T3-4 Повтор", t4), ("T3-5 Отмена", t5), ("T3-6 Таймаут", t6), ("T3-7 Блокировка", t7),
+         ("T3-4 Повтор", t4), ("T3-4б Повтор после оплаты", t4b), ("T3-5 Отмена", t5), ("T3-5б Повторные действия", t5b), ("T3-6 Таймаут", t6), ("T3-7 Блокировка", t7),
          ("T3-8 Чаевые > 50 %", t8), ("T3-9 Повторная оплата", t9)]
 
 

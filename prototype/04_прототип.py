@@ -6,7 +6,7 @@ CLI-прототип платформы чаевых — кейс 3.
     pay      qr.json      create + confirm за один запуск
     create   qr.json      проверки -> платёж в статусе CREATED
     confirm  payment_id   CREATED -> PENDING -> итог эмулятора
-    cancel   payment_id   CREATED -> CANCELED (из PENDING нельзя)
+    cancel   payment_id   CREATED -> CANCELED (иначе CANCEL_NOT_ALLOWED; повтор отмены — 200)
     reconcile             сверка: PENDING старше 15 минут -> DECLINED (GATEWAY_TIMEOUT)
 
 Параметры: --now ISO-время UTC, --qr-file путь к qr_links.csv, --out-dir каталог для *_out.csv.
@@ -322,10 +322,10 @@ def find_payment(store, payment_id):
 
 def confirm_payment(payment, qr_file, store, now):
     status = payment["status"]
-    if status == "PENDING":  # ADR-008: повторный confirm шлюз не дёргает
-        return payment
-    if status != "CREATED":
+    if status == "CANCELED":  # подтверждать нечего (ADR-002)
         raise PaymentError("PAYMENT_STATE_CONFLICT")
+    if status != "CREATED":  # повтор: текущий статус и прежний код, шлюз не вызывается
+        return payment
     store.transition(payment, "PENDING", None, "payment_submitted", "client", now)
     qr = load_qr(qr_file, payment["qr_id"])
     result, error = emulate_gateway(payment["qr_id"], qr["nonce"], load_scenarios())
@@ -341,10 +341,10 @@ def confirm_payment(payment, qr_file, store, now):
 
 
 def cancel_payment(payment, store, now):
-    if payment["status"] in ("PENDING", "SUCCESS"):
-        raise PaymentError("CANCEL_NOT_ALLOWED")
+    if payment["status"] == "CANCELED":  # повтор отмены идемпотентен (ADR-002)
+        return payment
     if payment["status"] != "CREATED":
-        raise PaymentError("PAYMENT_STATE_CONFLICT")
+        raise PaymentError("CANCEL_NOT_ALLOWED")
     store.transition(payment, "CANCELED", None, "payment_canceled", "client", now)
     return payment
 
