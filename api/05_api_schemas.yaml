@@ -369,7 +369,9 @@ paths:
           description: Платёж создан в статусе CREATED
           content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
         '200':
-          description: Повтор того же idempotency_key — возвращён существующий платёж (P-2)
+          description: >
+            Повтор того же idempotency_key — возвращён существующий платёж (P-2),
+            в том числе после SUCCESS или истечения QR: ключ ищется сразу после проверки подписи (ADR-004)
           content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
         '400': {$ref: '#/components/responses/BadRequest'}
         '403': {$ref: '#/components/responses/Forbidden'}
@@ -395,7 +397,9 @@ paths:
     post:
       tags: [payments]
       summary: Подтвердить платёж — CREATED → PENDING → итог от шлюза
-      description: Повторный confirm не вызывает шлюз, а возвращает текущий статус.
+      description: >
+        Повторный confirm не вызывает шлюз и отвечает как первый вызов: 202 для PENDING,
+        200 для SUCCESS, 402 для DECLINED. confirm отменённого платежа — 409 PAYMENT_STATE_CONFLICT (ADR-002).
       parameters: [{$ref: '#/components/parameters/PaymentId'}]
       requestBody:
         required: true
@@ -423,11 +427,11 @@ paths:
         content: {application/json: {schema: {$ref: '#/components/schemas/ConfirmRequest'}}}
       responses:
         '200':
-          description: CANCELED
+          description: CANCELED (в том числе повторная отмена)
           content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
         '404': {$ref: '#/components/responses/NotFound'}
         '409':
-          description: CANCEL_NOT_ALLOWED (из PENDING или SUCCESS) или PAYMENT_STATE_CONFLICT
+          description: CANCEL_NOT_ALLOWED — платёж в PENDING, SUCCESS или DECLINED
           content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
 
   /api/v1/reports/tips:
