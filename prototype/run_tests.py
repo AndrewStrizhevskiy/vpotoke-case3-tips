@@ -36,6 +36,7 @@ class Env:
         return proc.returncode, json.loads(proc.stdout) if proc.stdout.strip() else {}
 
     def req(self, **body):
+        body.setdefault("receipt_id", "r_%d" % (1000 + int(body["qr_id"][3:])))  # qr_001 -> r_1001
         path = os.path.join(self.dir, f"req_{len(os.listdir(self.dir))}.json")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(body, f)
@@ -85,6 +86,14 @@ def t3b():
     code, out = e.run(e.req(qr_id="qr_001", sig=sig_of("qr_001"), base_amount=637.00, tip_pct=5,
                             idempotency_key="k-3b"), now="2025-11-02T00:00:00Z")
     ok = code == 2 and out["error_code"] == "QR_EXPIRED" and e.rows() == []
+    return ok, f"код {code}, {out['error_code']}, строк: {len(e.rows())}"
+
+
+def t3c():
+    e = Env()
+    code, out = e.run(e.req(qr_id="qr_004", sig=sig_of("qr_004"), receipt_id="r_9999",
+                            base_amount=e2_amount("qr_004"), tip_pct=10, idempotency_key="k-3c"))
+    ok = code == 2 and out["error_code"] == "RECEIPT_MISMATCH" and e.rows() == []
     return ok, f"код {code}, {out['error_code']}, строк: {len(e.rows())}"
 
 
@@ -180,7 +189,7 @@ def t9():
     return ok, f"код {code}, {out['error_code']}, строк: {len(e.rows())}"
 
 
-TESTS = [("T3-1 Успех", t1), ("T3-2 Отказ", t2), ("T3-3 Неверный QR", t3), ("T3-3б QR истёк", t3b),
+TESTS = [("T3-1 Успех", t1), ("T3-2 Отказ", t2), ("T3-3 Неверный QR", t3), ("T3-3б QR истёк", t3b), ("T3-3в Чужой чек", t3c),
          ("T3-4 Повтор", t4), ("T3-4б Повтор после оплаты", t4b), ("T3-5 Отмена", t5), ("T3-5б Повторные действия", t5b), ("T3-6 Таймаут", t6), ("T3-7 Блокировка", t7),
          ("T3-8 Чаевые > 50 %", t8), ("T3-9 Повторная оплата", t9)]
 

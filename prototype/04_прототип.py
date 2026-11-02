@@ -49,7 +49,7 @@ RECONCILE_AFTER = timedelta(minutes=15)
 # Ошибка -> (HTTP-аналог из ADR-006, код выхода процесса)
 ERRORS = {
     "VALIDATION_ERROR": 400, "INVALID_QR": 422, "QR_EXPIRED": 410, "QR_USED": 409,
-    "MERCHANT_BLOCKED": 403, "AMOUNT_MISMATCH": 422, "AMOUNT_OUT_OF_RANGE": 422,
+    "MERCHANT_BLOCKED": 403, "RECEIPT_MISMATCH": 422, "AMOUNT_MISMATCH": 422, "AMOUNT_OUT_OF_RANGE": 422,
     "TIP_OUT_OF_RANGE": 422, "IDEMPOTENCY_CONFLICT": 409, "PAYMENT_IN_PROGRESS": 409,
     "CANCEL_NOT_ALLOWED": 409, "PAYMENT_STATE_CONFLICT": 409, "NOT_FOUND": 404,
 }
@@ -228,6 +228,8 @@ def validate_request(req):
         raise PaymentError("VALIDATION_ERROR")
     if not isinstance(req.get("qr_id"), str) or not re.fullmatch(r"qr_\d{3,}", req["qr_id"]):
         raise PaymentError("VALIDATION_ERROR")
+    if not isinstance(req.get("receipt_id"), str) or not re.fullmatch(r"r_\d{4}", req["receipt_id"]):
+        raise PaymentError("VALIDATION_ERROR")
     if "base_amount" not in req or isinstance(req["base_amount"], bool):
         raise PaymentError("VALIDATION_ERROR")
     if ("tip_pct" in req) == ("tip_amount" in req):
@@ -274,6 +276,8 @@ def create_payment(req, secret, qr_file, store, now):
         raise PaymentError("QR_USED")
     if load_merchant_status(qr["merchant_id"]) != "ACTIVE":
         raise PaymentError("MERCHANT_BLOCKED")
+    if req["receipt_id"] != qr["receipt_id"]:  # Q-5: чек из запроса должен быть чеком этого QR
+        raise PaymentError("RECEIPT_MISMATCH")
 
     # Сумма чека — серверная правда (ADR-003), затем P-1, Q-6, P-3
     receipt = load_receipt_amount(qr_id)
@@ -399,10 +403,13 @@ def main():
     commands = ("pay", "create", "confirm", "cancel", "reconcile")
     cmd, rest = (ns.args[0], ns.args[1:]) if ns.args[0] in commands else ("pay", ns.args)
     secret = get_secret()
-    now = parse_time(ns.now) if ns.now else datetime.now(timezone.utc).replace(microsecond=0)
     store = Store(ns.out_dir)
 
     try:
+        try:
+            now = parse_time(ns.now) if ns.now else datetime.now(timezone.utc).replace(microsecond=0)
+        except ValueError:  # --now не в формате 2025-11-01T18:00:00Z
+            raise PaymentError("VALIDATION_ERROR")
         if cmd == "reconcile":
             emit({"closed": reconcile(store, now)})
             sys.exit(0)
