@@ -14,6 +14,7 @@ Ctrl+P → «Сохранить как PDF», размер A4, поля «обы
 """
 import argparse
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -41,6 +42,20 @@ ul, ol { margin: 1mm 0; padding-left: 5mm; }
 """
 
 
+JOURNAL_WIDTHS = [4, 9, 12, 24, 19, 18, 14]  # %: узкие колонки журнала ИИ не должны ломать слова
+
+
+def set_journal_widths(html):
+    """Таблице журнала ИИ (первая колонка «№») задаём ширины колонок, остальные таблицы остаются автоматическими."""
+    start = html.find("<th>№</th>")
+    if start == -1:
+        return html
+    end = html.find("</tr>", start)
+    row, widths = html[start:end], iter(JOURNAL_WIDTHS)
+    row = re.sub(r"<th>", lambda m: f'<th style="width:{next(widths, 10)}%">', row)
+    return html[:start] + row + html[end:]
+
+
 def parse_args():
     ap = argparse.ArgumentParser(description="Экспорт приложения в PDF и проверка числа страниц")
     ap.add_argument("--input", default=os.path.join(HERE, "..", "..", "submission", "presenter", "appendix.md"))
@@ -63,6 +78,7 @@ def main():
     html_path, pdf_path = stem + ".html", args.output or stem + ".pdf"
     with open(args.input, encoding="utf-8") as f:
         body = markdown.markdown(f.read(), extensions=["tables", "fenced_code", "sane_lists"])
+    body = set_journal_widths(body)
     html = f"<!doctype html><html lang='ru'><head><meta charset='utf-8'><title>Приложение</title><style>{CSS}</style></head><body>{body}</body></html>"
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(html)
