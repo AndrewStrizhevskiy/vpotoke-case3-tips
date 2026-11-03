@@ -3,8 +3,8 @@
 Презентация (8 слайдов 16:9) из исходников deck/project/slides/*.html в PDF.
 
     pip install weasyprint
-    python3 submission/presenter/deck/build_deck_pdf.py            # -> deck/presentation.pdf
-    python3 submission/presenter/deck/build_deck_pdf.py out.pdf
+    python3 submission/deck/build_deck_pdf.py            # -> deck/presentation.pdf
+    python3 submission/deck/build_deck_pdf.py out.pdf
 
 Слайды — это HTML-подмножество редактора слайдов (холст 1920x1080, всё позиционировано абсолютно).
 Скрипт превращает каждый слайд в страницу PDF: <x-connector> рисуется линией со стрелкой,

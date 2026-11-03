@@ -3,7 +3,7 @@
 Экспорт приложения в PDF и проверка объёма (шаблон чемпионата: 10–15 страниц).
 
     pip install markdown weasyprint          # один раз
-    python3 docs/appendix/make_pdf.py        # submission/presenter/appendix.md -> .html + .pdf + число страниц
+    python3 docs/appendix/make_pdf.py        # submission/appendix.md -> .html + .pdf + число страниц
 
     python3 docs/appendix/make_pdf.py --max-pages 15 --min-pages 10
     python3 docs/appendix/make_pdf.py --input other.md --output other.pdf
@@ -58,7 +58,7 @@ def set_journal_widths(html):
 
 def parse_args():
     ap = argparse.ArgumentParser(description="Экспорт приложения в PDF и проверка числа страниц")
-    ap.add_argument("--input", default=os.path.join(HERE, "..", "..", "submission", "presenter", "appendix.md"))
+    ap.add_argument("--input", default=os.path.join(HERE, "..", "..", "submission", "appendix.md"))
     ap.add_argument("--output", help="по умолчанию — рядом с входным файлом, расширение .pdf")
     ap.add_argument("--min-pages", type=int, default=10)
     ap.add_argument("--max-pages", type=int, default=15)

@@ -13,7 +13,7 @@
 ## Вариант под палитру презентации
 
 `SHOT_THEME=rose python3 docs/screenshots/make_screenshots.py tests` рисует тот же вывод на бордовом фоне
-(`tests_rose.png`, он используется на слайде 6; исходники слайдов — в `submission/presenter/deck/` после влития PR #7).
+(`tests_rose.png`, он используется на слайде 6; исходники слайдов — в `submission/deck/` после влития PR #7).
 
 ## Как пересоздать
 

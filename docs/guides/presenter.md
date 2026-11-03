@@ -19,8 +19,8 @@
 | 7 | Риски и ограничения: «риск → мера», ограничения, масштабирование | `docs/11-security.md` (U-1…U-8) | сделать |
 | 8 | Итоги: почему жизнеспособно, ссылка на Git, вопросы | — | сделать |
 
-**Актуальные версии:** презентация — `submission/presenter/presentation.pdf` (исходники слайдов и сборка — `submission/presenter/deck/`),
-приложение — `submission/presenter/appendix.md` и `appendix.pdf`. Таблица выше — исходный план слайдов.
+**Актуальные версии:** презентация — `submission/presentation.pdf` (исходники слайдов и сборка — `submission/deck/`),
+приложение — `submission/appendix.md` и `appendix.pdf`. Таблица выше — исходный план слайдов.
 
 **Отчётность** есть в брифе, но не в шаблоне чемпионата. Предлагаю упомянуть её в FR на слайде 2
 и показать одну цифру на слайде 8 (m_001 за ноябрь: 414.85 ₽ чаевых, 83 % успешных платежей).
@@ -38,12 +38,12 @@
 
 ```bash
 python3 docs/appendix/make_pdf.py                                # приложение: appendix.md -> appendix.pdf, проверка 10–15 страниц
-python3 submission/presenter/deck/build_deck_pdf.py presentation.pdf   # презентация из исходников слайдов
+python3 submission/deck/build_deck_pdf.py presentation.pdf   # презентация из исходников слайдов
 ```
 
 Скрипт приложения печатает число страниц и завершается с ошибкой, если их больше 15. Если WeasyPrint не запускается
 (на Windows ему нужен GTK), он всё равно пишет `appendix.html`: откройте в браузере → Ctrl+P → «Сохранить как PDF».
-Подробности по презентации — `submission/presenter/deck/README.md`.
+Подробности по презентации — `submission/deck/README.md`.
 
 ## Приложение: что куда
 
