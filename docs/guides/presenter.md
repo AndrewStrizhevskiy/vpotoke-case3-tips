@@ -47,6 +47,7 @@
 | A.1 Схема системы | `docs/a1-system-diagram.md` + `diagrams/system.png` | архитектор, готово |
 | A.2 ER-модель | `docs/a2-er-model.md` + `diagrams/er.png` | архитектор, готово |
 | A.3 Состояния платежа | `docs/a3-payment-states.md` + `diagrams/states.png` | архитектор, готово |
+| A.4 Диалоговая форма и генерация QR | `docs/06-qr-and-dialog.md` + `diagrams/dialog.png` | архитектор, готово |
 | B.1 Правила Q и P с обоснованием | `docs/02-rules.md` | аналитик |
 | B.2 Матрица ошибок | `docs/b2-error-matrix.md` | архитектор, готово |
 | B.3 Тесты с фактом | `docs/03-tests.md` | разработчик |
