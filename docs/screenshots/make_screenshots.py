@@ -25,6 +25,13 @@ SIZE, PAD, BAR, COLS = 22, 30, 48, 112
 BG, BAR_BG, FG = "#14181F", "#222833", "#E6E8EB"
 COLORS = {"90": "#8A93A0", "31": "#FF7B7B", "32": "#5FD38D", "33": "#F2C94C", "34": "#6CB2FF", "36": "#5CE1E6"}
 
+# SHOT_THEME=rose — тёмно-бордовый фон под палитру презентации; файлы получают суффикс _rose
+SUFFIX = ""
+if os.environ.get("SHOT_THEME") == "rose":
+    BG, BAR_BG, FG = "#2B0A0A", "#3C1313", "#F6E4E0"
+    COLORS["90"] = "#C99B96"
+    SUFFIX = "_rose"
+
 SGR = re.compile(r"\x1b\[([0-9;]*)m")
 
 # имя -> (заголовок окна, [(команда для показа, команда запуска, рабочий каталог)])
@@ -113,7 +120,7 @@ def render(name):
         for col, (ch, color, is_bold) in enumerate(cells):
             if ch != " ":
                 d.text((PAD + col * adv, y), ch, font=bold if is_bold else font, fill=color)
-    path = os.path.join(HERE, f"{name}.png")
+    path = os.path.join(HERE, f"{name}{SUFFIX}.png")
     img.save(path)
     print(f"{os.path.relpath(path, ROOT)}: {width}x{height}, строк {len(lines)}")
 
