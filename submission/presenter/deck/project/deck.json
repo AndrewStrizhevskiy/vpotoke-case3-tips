@@ -1,0 +1,17 @@
+{
+  "v": 4,
+  "createdOnFiles": {"v": 1, "at": "2026-11-02T14:40:00Z"},
+  "lists": "css",
+  "title": "Онлайн-чаевые — презентация",
+  "order": ["cover", "problem", "arch", "flow", "security", "tests", "risks", "final"],
+  "sections": {
+    "s1": {"description": "Задача, требования и архитектура платформы чаевых", "start": "cover"},
+    "s2": {"description": "Платёж, безопасность и отказоустойчивость", "start": "flow"},
+    "s3": {"description": "Тесты, риски и итоги", "start": "tests"}
+  },
+  "faces": {
+    "manrope": {"family": "Manrope", "href": "https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&display=swap"},
+    "playfair-display": {"family": "Playfair Display", "href": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&display=swap"}
+  },
+  "designSystems": []
+}

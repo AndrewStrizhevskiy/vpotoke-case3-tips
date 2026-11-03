@@ -3,8 +3,7 @@
 Экспорт приложения в PDF и проверка объёма (шаблон чемпионата: 10–15 страниц).
 
     pip install markdown weasyprint          # один раз
-    python3 docs/appendix/build_appendix.py  # собрать appendix.md из документов
-    python3 docs/appendix/make_pdf.py        # appendix.html + appendix.pdf + число страниц
+    python3 docs/appendix/make_pdf.py        # submission/presenter/appendix.md -> .html + .pdf + число страниц
 
     python3 docs/appendix/make_pdf.py --max-pages 15 --min-pages 10
     python3 docs/appendix/make_pdf.py --input other.md --output other.pdf
@@ -44,7 +43,7 @@ ul, ol { margin: 1mm 0; padding-left: 5mm; }
 
 def parse_args():
     ap = argparse.ArgumentParser(description="Экспорт приложения в PDF и проверка числа страниц")
-    ap.add_argument("--input", default=os.path.join(HERE, "appendix.md"))
+    ap.add_argument("--input", default=os.path.join(HERE, "..", "..", "submission", "presenter", "appendix.md"))
     ap.add_argument("--output", help="по умолчанию — рядом с входным файлом, расширение .pdf")
     ap.add_argument("--min-pages", type=int, default=10)
     ap.add_argument("--max-pages", type=int, default=15)
@@ -54,7 +53,7 @@ def parse_args():
 def main():
     args = parse_args()
     if not os.path.exists(args.input):
-        sys.exit(f"Нет файла {args.input}. Сначала: python3 docs/appendix/build_appendix.py")
+        sys.exit(f"Нет файла {args.input}. Укажите --input путь/к/appendix.md")
     try:
         import markdown
     except ImportError:

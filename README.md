@@ -26,6 +26,7 @@ data/
   gateway_scenarios.csv  таблица сценариев эмулятора (ADR-001)
 api/
   05_api_schemas.yaml  заполненный OpenAPI (проходит openapi-spec-validator)
+submission/presenter/  сдача: презентация (PDF + исходники слайдов + скрипт сборки), приложение (md + PDF), доказательства запусков
 diagrams/              схемы: system / states / er / dialog в .png, .svg + генераторы (.drawio — для первых трёх)
 docs/
   README.md            указатель ADR
@@ -44,13 +45,12 @@ docs/
 
 | Роль | Файлы | Статус |
 |-|-|-|
-| Архитектор | ADR-001…009, A.1–A.3, B.2, 05_api, 07, 11_ИБ, [QR и диалог](docs/06-qr-and-dialog.md), команды `qr` и `report` прототипа, слайды 3–5 | готово, нужна командная вычитка |
+| Архитектор | ADR-001…009, A.1–A.3, B.2, 05_api, 07, 11_ИБ, [QR и диалог](docs/06-qr-and-dialog.md), команды `qr` и `report` прототипа | готово, нужна командная вычитка |
 | Аналитик | [правила](docs/02-rules.md), [роли](docs/02-roles.md), [словарь данных](docs/03-data-dictionary.md), [требования](docs/04-requirements.md), [отчёты](docs/09-reports.md) | влито (PR #1), открытых вопросов нет; нужна командная вычитка |
 | Разработчик | прототип и тесты ([PR #3](https://github.com/AndrewStrizhevskiy/vpotoke-case3-tips/pull/3)), [03_тесты](docs/03-tests.md) | влито, 17 тестов из 17; скриншоты для приложения готовы ([docs/screenshots](docs/screenshots/README.md)), остался скриншот коммита финальной ветки |
-| Презентатор | слайды 1, 2, 6, 7, 8, приложение, PDF | [PR #4](https://github.com/AndrewStrizhevskiy/vpotoke-case3-tips/pull/4): собранное приложение и план слайдов; слайды не написаны |
+| Презентация и приложение | [`submission/presenter/`](submission/presenter/): `presentation.pdf` (8 слайдов), `appendix.pdf` (13 страниц) | готовы; тексты слайдов и заметки — черновик, их нужно переписать своими словами |
 
-Черновик слайдов 3–5: https://claude.ai/artifact/7Am3MXDGZ6bGuSUsDPhS4n
-(приватный: архитектор открывает доступ через Share).
+Пересобрать презентацию: `submission/presenter/deck/README.md`; приложение: `python3 docs/appendix/make_pdf.py`.
 
 ## Команды
 
