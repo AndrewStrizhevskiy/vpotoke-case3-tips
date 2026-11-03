@@ -63,7 +63,7 @@ Seed-данные трогать нельзя. Для теста T3-7 нужен
 
 - [x] Скриншот вывода прототипа для qr_001 и qr_003 — `tests.png`, `demo.png`
 - [x] Скриншот `cd prototype/01_данные && md5sum -c MD5SUMS` (все OK) — `md5.png`
-- [ ] Скриншот последнего коммита в ветке `team_N_case_3`: `python3 docs/screenshots/make_screenshots.py commit` после создания ветки
+- [ ] Скриншот последнего коммита в ветке `team_11_case_3`: `python3 docs/screenshots/make_screenshots.py commit` после создания ветки
 - [x] «Факт» и «Пройден» в `docs/03-tests.md` по каждому тесту
 
 ## Готово, когда
