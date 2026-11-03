@@ -1,8 +1,7 @@
 # Исходники презентации
 
-`presentation.pdf` в папке выше — собранный из этих файлов PDF (8 слайдов 16:9).
-`presentation.pptx` там же — **старая версия** до смены стиля; актуален PDF. Свежий PPTX можно выгрузить
-из редактора слайдов (Share → Export), исходники слайдов в `project/` совпадают с тем, что лежит в редакторе.
+`../presentation.pdf` — собранный из этих файлов PDF (8 слайдов 16:9).
+Заметки докладчика лежат в слайдах (`<aside>` в каждом `project/slides/*.html`).
 
 | Что | Где |
 |-|-|
@@ -15,7 +14,7 @@
 
 ```bash
 pip install weasyprint
-python3 submission/presenter/deck/build_deck_pdf.py presentation.pdf
+python3 submission/deck/build_deck_pdf.py presentation.pdf
 ```
 
 Нужен интернет: шрифты Manrope и Playfair Display берутся с Google Fonts. Заметки докладчика (`<aside>` в каждом
