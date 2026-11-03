@@ -1,0 +1,34 @@
+<section id="risks" data-transition="fade" style="background:#2E0000;color:#1F0A0A;font-family:'Manrope', Arial, sans-serif">
+<div style="position:absolute;left:20px;top:20px;width:1880px;height:1040px;border-radius:40px;background:#FBEDEA"></div>
+<div style="position:absolute;left:90px;top:68px;width:22px;height:22px;border-radius:6px;background:#EC4C41"></div>
+<p style="position:absolute;left:126px;top:58px;width:360px;font-size:28px;font-weight:800;letter-spacing:3px;color:#1F0A0A">ВПОТОКЕ</p>
+<p style="position:absolute;left:1520px;top:52px;width:310px;font-size:24px;font-weight:700;text-align:center;color:#F5A5A0;background:#5A0000;padding:14px 0;border-radius:999px">Кейс 3 · 07 / 08</p>
+<h2 style="position:absolute;left:90px;top:140px;width:700px;font-size:96px;font-weight:300;line-height:1;color:#1F0A0A">РИСКИ</h2>
+<p style="position:absolute;left:444px;top:137px;width:900px;font-family:'Playfair Display', Georgia, serif;font-size:96px;line-height:1;color:#1F0A0A">и ограничения</p>
+<div style="position:absolute;left:90px;top:290px;width:858px;height:710px;border-radius:28px;background:#5A0000"></div>
+<p style="position:absolute;left:130px;top:324px;width:780px;font-size:24px;font-weight:700;letter-spacing:1px;color:#F5A5A0">[ РИСК → МЕРА ]</p>
+<p style="position:absolute;left:130px;top:392px;width:780px;font-size:32px;font-weight:700;color:#F5A5A0">Подмена суммы</p>
+<p style="position:absolute;left:130px;top:440px;width:780px;font-size:28px;line-height:1.3;color:#FBEDEA">сумма из реестра кассы, не от клиента; остаётся доверие кассе</p>
+<div style="position:absolute;left:130px;top:528px;width:778px;height:2px;background:#7A2A2A"></div>
+<p style="position:absolute;left:130px;top:548px;width:780px;font-size:32px;font-weight:700;color:#F5A5A0">Подделка и повтор QR</p>
+<p style="position:absolute;left:130px;top:596px;width:780px;font-size:28px;line-height:1.3;color:#FBEDEA">подпись HMAC, одноразовый nonce, срок не больше 24 часов</p>
+<div style="position:absolute;left:130px;top:684px;width:778px;height:2px;background:#7A2A2A"></div>
+<p style="position:absolute;left:130px;top:704px;width:780px;font-size:32px;font-weight:700;color:#F5A5A0">Двойное списание</p>
+<p style="position:absolute;left:130px;top:752px;width:780px;font-size:28px;line-height:1.3;color:#FBEDEA">ключ идемпотентности и блокировка QR на время платежа</p>
+<div style="position:absolute;left:130px;top:840px;width:778px;height:2px;background:#7A2A2A"></div>
+<p style="position:absolute;left:130px;top:860px;width:780px;font-size:32px;font-weight:700;color:#F5A5A0">Утечка ключа подписи</p>
+<p style="position:absolute;left:130px;top:908px;width:780px;font-size:28px;line-height:1.3;color:#FBEDEA">ключ в окружении, не в Git; ротация без смены формата</p>
+<div style="position:absolute;left:972px;top:290px;width:417px;height:710px;border-radius:28px;background:#F6CFCB"></div>
+<p style="position:absolute;left:1008px;top:324px;width:350px;font-size:24px;font-weight:700;letter-spacing:1px;color:#1F0A0A">[ ОГРАНИЧЕНИЯ ]</p>
+<p style="position:absolute;left:1008px;top:392px;width:350px;font-size:29px;line-height:1.3;color:#1F0A0A">Шлюз — эмулятор, реальных списаний нет</p>
+<p style="position:absolute;left:1008px;top:536px;width:350px;font-size:29px;line-height:1.3;color:#1F0A0A">Данные синтетические</p>
+<p style="position:absolute;left:1008px;top:640px;width:350px;font-size:29px;line-height:1.3;color:#1F0A0A">Регистрация, роли и лимиты описаны, но не в коде</p>
+<p style="position:absolute;left:1008px;top:824px;width:350px;font-size:29px;line-height:1.3;color:#1F0A0A">CSV вместо базы данных</p>
+<div style="position:absolute;left:1413px;top:290px;width:417px;height:710px;border-radius:28px;background:#EC4C41"></div>
+<p style="position:absolute;left:1449px;top:324px;width:350px;font-size:24px;font-weight:700;letter-spacing:1px;color:#1F0A0A">[ ДАЛЬШЕ ]</p>
+<p style="position:absolute;left:1449px;top:392px;width:350px;font-family:'Playfair Display', Georgia, serif;font-size:36px;line-height:1.2;color:#1F0A0A">реальный платёжный шлюз</p>
+<p style="position:absolute;left:1449px;top:540px;width:350px;font-family:'Playfair Display', Georgia, serif;font-size:36px;line-height:1.2;color:#1F0A0A">сумма внутри подписи QR</p>
+<p style="position:absolute;left:1449px;top:688px;width:350px;font-family:'Playfair Display', Georgia, serif;font-size:36px;line-height:1.2;color:#1F0A0A">валюты для Юго-Восточной Азии</p>
+<p style="position:absolute;left:1449px;top:860px;width:350px;font-family:'Playfair Display', Georgia, serif;font-size:36px;line-height:1.2;color:#1F0A0A">база данных и транзакции</p>
+<aside>Слева риски и меры. Два остаточных риска называем сами: мы доверяем кассе, а ключ подписи хранится на сервере. В середине честные ограничения учебного решения: банк эмулируется, данные синтетические, регистрация и роли описаны, но не реализованы в коде. Справа путь развития.</aside>
+</section>
