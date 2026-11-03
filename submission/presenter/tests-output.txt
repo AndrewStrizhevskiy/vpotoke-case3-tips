@@ -14,5 +14,6 @@ PASS  T3-9 Повторная оплата: код 2, QR_USED, строк: 1
 PASS  T3-10 Выпуск QR: qr_101 новый, повтор: qr_101 (new=False); платёж CREATED, итог 1375.55; другая сумма: AMOUNT_MISMATCH
 PASS  T3-11 Проверки выпуска QR: MERCHANT_BLOCKED, ACCESS_DENIED, AMOUNT_MISMATCH, VALIDATION_ERROR; QR не выпущен
 PASS  T3-12 Отчёты: m_001: 414.85 / 6 / 9.0 / 0.83; e_001: 83.6 / 2 / 41.8 / 2025-11-03; по дням: 2; пустой период: 0
+PASS  T3-13 Повторы и конфликты: IDEMPOTENCY_CONFLICT; отмена SUCCESS/DECLINED: CANCEL_NOT_ALLOWED; второй платёж по QR: PAYMENT_IN_PROGRESS; неизвестный платёж: NOT_FOUND; сверка через 5 мин: [], через 20 мин: ['p_0101'] -> DECLINED
 
-Итого: 16 из 16 пройдено
+Итого: 17 из 17 пройдено
