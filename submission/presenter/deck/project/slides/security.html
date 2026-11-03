@@ -1,0 +1,40 @@
+<section id="security" data-transition="fade" style="background:#2E0000;color:#1F0A0A;font-family:'Manrope', Arial, sans-serif">
+<div style="position:absolute;left:20px;top:20px;width:1880px;height:1040px;border-radius:40px;background:#FBEDEA"></div>
+<div style="position:absolute;left:90px;top:68px;width:22px;height:22px;border-radius:6px;background:#EC4C41"></div>
+<p style="position:absolute;left:126px;top:58px;width:360px;font-size:28px;font-weight:800;letter-spacing:3px;color:#1F0A0A">ВПОТОКЕ</p>
+<p style="position:absolute;left:1520px;top:52px;width:310px;font-size:24px;font-weight:700;text-align:center;color:#F5A5A0;background:#5A0000;padding:14px 0;border-radius:999px">Кейс 3 · 05 / 08</p>
+<h2 style="position:absolute;left:90px;top:140px;width:1000px;font-size:96px;font-weight:300;line-height:1;color:#1F0A0A">БЕЗОПАСНОСТЬ</h2>
+<p style="position:absolute;left:887px;top:137px;width:700px;font-family:'Playfair Display', Georgia, serif;font-size:96px;line-height:1;color:#1F0A0A">и отказы</p>
+<div style="position:absolute;left:90px;top:290px;width:408px;height:234px;border-radius:28px;background:#FFF8F6"></div>
+<p style="position:absolute;left:122px;top:318px;width:350px;font-size:28px;font-weight:800;letter-spacing:1px;color:#1F0A0A">МЕРЧАНТ</p>
+<p style="position:absolute;left:122px;top:366px;width:350px;font-size:28px;line-height:1.3;color:#1F0A0A">QR на чеки заведения, отчёт по своему заведению</p>
+<div style="position:absolute;left:522px;top:290px;width:408px;height:234px;border-radius:28px;background:#FFF8F6"></div>
+<p style="position:absolute;left:554px;top:318px;width:350px;font-size:28px;font-weight:800;letter-spacing:1px;color:#1F0A0A">ОФИЦИАНТ</p>
+<p style="position:absolute;left:554px;top:366px;width:350px;font-size:28px;line-height:1.3;color:#1F0A0A">QR только на себя, видит только свои чаевые</p>
+<div style="position:absolute;left:90px;top:548px;width:408px;height:234px;border-radius:28px;background:#FFF8F6"></div>
+<p style="position:absolute;left:122px;top:576px;width:350px;font-size:28px;font-weight:800;letter-spacing:1px;color:#1F0A0A">КЛИЕНТ</p>
+<p style="position:absolute;left:122px;top:624px;width:350px;font-size:28px;line-height:1.3;color:#1F0A0A">сканирует и платит свой чек, без регистрации</p>
+<div style="position:absolute;left:522px;top:548px;width:408px;height:234px;border-radius:28px;background:#5A0000"></div>
+<p style="position:absolute;left:554px;top:576px;width:350px;font-size:28px;font-weight:800;letter-spacing:1px;color:#F5A5A0">АДМИНИСТРАТОР</p>
+<p style="position:absolute;left:554px;top:624px;width:350px;font-size:28px;line-height:1.3;color:#FBEDEA">активирует и блокирует мерчантов, платежи не трогает</p>
+<div style="position:absolute;left:90px;top:806px;width:840px;height:194px;border-radius:28px;background:#EC4C41"></div>
+<p style="position:absolute;left:126px;top:840px;width:770px;font-size:30px;font-weight:700;line-height:1.35;color:#1F0A0A">HMAC-SHA256 · одноразовый nonce · реквизиты ****NNNN · PAN и CVV не храним</p>
+<div style="position:absolute;left:954px;top:290px;width:876px;height:710px;border-radius:28px;background:#5A0000"></div>
+<p style="position:absolute;left:994px;top:324px;width:320px;font-size:24px;font-weight:700;letter-spacing:1px;color:#F5A5A0">[ СИТУАЦИЯ ]</p>
+<p style="position:absolute;left:1350px;top:324px;width:460px;font-size:24px;font-weight:700;letter-spacing:1px;color:#F5A5A0">[ ОТВЕТ И МЕРА ]</p>
+<p style="position:absolute;left:994px;top:392px;width:330px;font-size:30px;font-weight:700;line-height:1.2;color:#FBEDEA">Подмена QR или суммы</p>
+<p style="position:absolute;left:1350px;top:394px;width:460px;font-size:28px;line-height:1.3;color:#E9B7B2">ошибка 422, платёж не создаётся</p>
+<div style="position:absolute;left:994px;top:490px;width:816px;height:2px;background:#7A2A2A"></div>
+<p style="position:absolute;left:994px;top:512px;width:330px;font-size:30px;font-weight:700;line-height:1.2;color:#FBEDEA">Двойной клик, повтор</p>
+<p style="position:absolute;left:1350px;top:514px;width:460px;font-size:28px;line-height:1.3;color:#E9B7B2">тот же платёж, второго не будет</p>
+<div style="position:absolute;left:994px;top:610px;width:816px;height:2px;background:#7A2A2A"></div>
+<p style="position:absolute;left:994px;top:632px;width:330px;font-size:30px;font-weight:700;line-height:1.2;color:#FBEDEA">Отказ банка</p>
+<p style="position:absolute;left:1350px;top:634px;width:460px;font-size:28px;line-height:1.3;color:#E9B7B2">DECLINED, чаевые не засчитываются</p>
+<div style="position:absolute;left:994px;top:730px;width:816px;height:2px;background:#7A2A2A"></div>
+<p style="position:absolute;left:994px;top:752px;width:330px;font-size:30px;font-weight:700;line-height:1.2;color:#FBEDEA">Банк не отвечает</p>
+<p style="position:absolute;left:1350px;top:754px;width:460px;font-size:28px;line-height:1.3;color:#E9B7B2">PENDING, через 15 минут сверка закрывает платёж</p>
+<div style="position:absolute;left:994px;top:850px;width:816px;height:2px;background:#7A2A2A"></div>
+<p style="position:absolute;left:994px;top:872px;width:330px;font-size:30px;font-weight:700;line-height:1.2;color:#FBEDEA">Отмена после отправки</p>
+<p style="position:absolute;left:1350px;top:874px;width:460px;font-size:28px;line-height:1.3;color:#E9B7B2">запрещена: деньги не теряем</p>
+<aside>Слева четыре роли и их права: администратор управляет платформой, но в платежах не участвует. Внизу защита данных. Справа — что происходит, когда что-то идёт не так: главное, что ни одна ошибка не теряет деньги. Отказ и таймаут заканчиваются без списания, а отменить можно только платёж, который не ушёл в банк. Полная матрица из 27 ситуаций — в приложении, раздел B.2.</aside>
+</section>
