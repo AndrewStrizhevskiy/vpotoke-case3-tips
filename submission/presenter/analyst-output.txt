@@ -1,0 +1,49 @@
+{
+  "row_counts": {
+    "merchants": 20,
+    "employees": 60,
+    "payments": 100,
+    "qr_links": 100
+  },
+  "payment_statuses": {
+    "SUCCESS": 70,
+    "DECLINED": 10,
+    "PENDING": 10,
+    "CANCELED": 10
+  },
+  "reports": {
+    "merchant": {
+      "merchant_id": "m_001",
+      "period": "2025-11",
+      "tips_total": 414.85,
+      "payments_count": 6,
+      "avg_tip_pct": 9.0,
+      "success_rate": 0.83
+    },
+    "employee": {
+      "employee_id": "e_001",
+      "period": "2025-11",
+      "tips_total": 83.6,
+      "payments_count": 2,
+      "avg_tip_amount": 41.8,
+      "top_day": "2025-11-03"
+    },
+    "daily": {
+      "merchant_id": "m_001",
+      "daily": [
+        {
+          "date": "2025-11-01",
+          "tips_total": 245.9,
+          "payments_count": 3,
+          "avg_tip_pct": 10.0
+        },
+        {
+          "date": "2025-11-03",
+          "tips_total": 168.95,
+          "payments_count": 3,
+          "avg_tip_pct": 7.5
+        }
+      ]
+    }
+  }
+}

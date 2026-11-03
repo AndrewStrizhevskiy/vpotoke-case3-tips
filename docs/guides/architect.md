@@ -15,12 +15,12 @@
 | Шаблон 07 — эмуляция платежа | `docs/07-payment-emulator.md` |
 | Шаблон 11 — ИБ | `docs/11-security.md` |
 | OpenAPI (шаблон 05) | `api/05_api_schemas.yaml` |
-| Слайды 3–5 | https://claude.ai/artifact/7Am3MXDGZ6bGuSUsDPhS4n |
+| Презентация (8 слайдов) | `submission/presenter/presentation.pdf`, исходники — `submission/presenter/deck/` |
 
 ## Что осталось
 
 - [ ] Вычитать все документы и переписать своими словами то, что пойдёт в сдачу
-- [ ] Открыть доступ к слайдам презентатору (Share)
+- [ ] Переписать тексты слайдов своими словами (`submission/presenter/deck/project/slides/*.html`) и пересобрать PDF
 - [ ] Проверить `.drawio`-файлы в draw.io: подписи стрелок могли сместиться
 - [ ] Свериться с аналитиком: матрица ролей в `02_roles` = раздел 3 в `11-security.md`
 - [ ] Принять у разработчика прототип: порядок проверок, коды ошибок и колонки CSV — как в ADR
