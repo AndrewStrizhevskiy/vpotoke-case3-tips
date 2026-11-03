@@ -256,10 +256,47 @@ def t12():
                 f"по дням: {len(d['daily'])}; пустой период: {z['payments_count']}")
 
 
+def t13():
+    """Строки B.2 без отдельного теста: конфликт ключа, отмена закрытого платежа, второй платёж по QR, сверка, неизвестный платёж."""
+    body = dict(qr_id="qr_001", sig=sig_of("qr_001"), base_amount=637.00, tip_pct=5)
+    e = Env()
+    e.run(e.req(**body, idempotency_key="k-13a"))  # SUCCESS, p_0101
+    c1, conflict = e.run(e.req(**dict(body, tip_pct=10, idempotency_key="k-13a")))
+    c2, cancel_paid = e.run("cancel", "p_0101")
+    c3, missing = e.run("confirm", "p_9999")
+
+    e2 = Env()
+    e2.run(e2.req(qr_id="qr_003", sig=sig_of("qr_003"), base_amount=911.00, tip_pct=15, idempotency_key="k-13b"))
+    c4, cancel_declined = e2.run("cancel", "p_0101")
+
+    e3 = Env()
+    e3.run("create", e3.req(**body, idempotency_key="k-13c"))  # CREATED, QR занят
+    c5, busy = e3.run("create", e3.req(**body, idempotency_key="k-13d"))
+
+    e4 = Env()
+    e4.run(e4.req(qr_id="qr_010", sig=sig_of("qr_010"), base_amount=e2_amount("qr_010"), tip_pct=10,
+                  idempotency_key="k-13e"))  # PENDING, ждёт сверку
+    _, early = e4.run("reconcile", now="2025-11-01T18:05:00Z")
+    _, late = e4.run("reconcile", now="2025-11-01T18:20:00Z")
+    closed = e4.rows()[0]
+
+    ok = (c1 == 2 and conflict["error_code"] == "IDEMPOTENCY_CONFLICT"
+          and c2 == 2 and cancel_paid["error_code"] == "CANCEL_NOT_ALLOWED"
+          and c3 == 2 and missing["error_code"] == "NOT_FOUND"
+          and c4 == 2 and cancel_declined["error_code"] == "CANCEL_NOT_ALLOWED"
+          and c5 == 2 and busy["error_code"] == "PAYMENT_IN_PROGRESS"
+          and early["closed"] == [] and late["closed"] == ["p_0101"]
+          and closed["status"] == "DECLINED" and closed["error_code"] == "GATEWAY_TIMEOUT")
+    return ok, (f"{conflict['error_code']}; отмена SUCCESS/DECLINED: {cancel_paid['error_code']}; "
+                f"второй платёж по QR: {busy['error_code']}; неизвестный платёж: {missing['error_code']}; "
+                f"сверка через 5 мин: {early['closed']}, через 20 мин: {late['closed']} -> {closed['status']}")
+
+
 TESTS = [("T3-1 Успех", t1), ("T3-2 Отказ", t2), ("T3-3 Неверный QR", t3), ("T3-3б QR истёк", t3b), ("T3-3в Чужой чек", t3c),
          ("T3-4 Повтор", t4), ("T3-4б Повтор после оплаты", t4b), ("T3-5 Отмена", t5), ("T3-5б Повторные действия", t5b), ("T3-6 Таймаут", t6), ("T3-7 Блокировка", t7),
          ("T3-8 Чаевые > 50 %", t8), ("T3-9 Повторная оплата", t9),
-         ("T3-10 Выпуск QR", t10), ("T3-11 Проверки выпуска QR", t11), ("T3-12 Отчёты", t12)]
+         ("T3-10 Выпуск QR", t10), ("T3-11 Проверки выпуска QR", t11), ("T3-12 Отчёты", t12),
+         ("T3-13 Повторы и конфликты", t13)]
 
 
 def main():
