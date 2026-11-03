@@ -46,7 +46,7 @@ docs/
 |-|-|-|
 | Архитектор | ADR-001…009, A.1–A.3, B.2, 05_api, 07, 11_ИБ, [QR и диалог](docs/06-qr-and-dialog.md), команды `qr` и `report` прототипа, слайды 3–5 | готово, нужна командная вычитка |
 | Аналитик | [правила](docs/02-rules.md), [роли](docs/02-roles.md), [словарь данных](docs/03-data-dictionary.md), [требования](docs/04-requirements.md), [отчёты](docs/09-reports.md) | влито (PR #1), открытых вопросов нет; нужна командная вычитка |
-| Разработчик | прототип и тесты ([PR #3](https://github.com/AndrewStrizhevskiy/vpotoke-case3-tips/pull/3)), [03_тесты](docs/03-tests.md) | влито, 16 тестов из 16; скриншоты для приложения готовы ([docs/screenshots](docs/screenshots/README.md)), остался скриншот коммита финальной ветки |
+| Разработчик | прототип и тесты ([PR #3](https://github.com/AndrewStrizhevskiy/vpotoke-case3-tips/pull/3)), [03_тесты](docs/03-tests.md) | влито, 17 тестов из 17; скриншоты для приложения готовы ([docs/screenshots](docs/screenshots/README.md)), остался скриншот коммита финальной ветки |
 | Презентатор | слайды 1, 2, 6, 7, 8, приложение, PDF | [PR #4](https://github.com/AndrewStrizhevskiy/vpotoke-case3-tips/pull/4): собранное приложение и план слайдов; слайды не написаны |
 
 Черновик слайдов 3–5: https://claude.ai/artifact/7Am3MXDGZ6bGuSUsDPhS4n
@@ -65,7 +65,7 @@ python3 docs/checks/analyst_data.py
 cd diagrams && python3 build_system.py && python3 build_states.py && python3 build_er.py
 convert -density 192 system.svg system.png   # так же для states и er
 
-# прототип: тесты (16 из 16) и примеры команд
+# прототип: тесты (17 из 17) и примеры команд
 export TIPS_HMAC_SECRET=demo-secret-k3
 python3 prototype/run_tests.py
 python3 prototype/demo.py                       # сквозная демонстрация для защиты

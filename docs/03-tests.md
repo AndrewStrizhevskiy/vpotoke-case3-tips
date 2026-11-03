@@ -1,7 +1,7 @@
 # Тесты — кейс 3 (заполненный шаблон 03_тесты)
 
 Прогон: `export TIPS_HMAC_SECRET=<демо-ключ из README> && python3 prototype/run_tests.py`.
-Все запуски с `--now 2025-11-01T18:00:00Z`, если не сказано иное. Результат: 16 из 16.
+Все запуски с `--now 2025-11-01T18:00:00Z`, если не сказано иное. Результат: 17 из 17.
 
 | Тест | Вход | Ожидание | Факт | Пройден |
 |-|-|-|-|-|
@@ -21,6 +21,7 @@
 | T3-10 Выпуск QR | `qr` для m_001 / e_001 / чек r_2001 на 1250.50; повтор; платёж по ссылке; платёж с другой суммой | QR выпущен, повтор возвращает тот же; CREATED, итог 1375.55; AMOUNT_MISMATCH | qr_101 новый, повтор: qr_101 (new=False); платёж CREATED, итог 1375.55; другая сумма: AMOUNT_MISMATCH | да |
 | T3-11 Проверки выпуска QR | заблокированный мерчант m_019; официант другого мерчанта; чек r_1001 с другой суммой; неверный формат | MERCHANT_BLOCKED, ACCESS_DENIED, AMOUNT_MISMATCH, VALIDATION_ERROR; QR не выпущен | MERCHANT_BLOCKED, ACCESS_DENIED, AMOUNT_MISMATCH, VALIDATION_ERROR; QR не выпущен | да |
 | T3-12 Отчёты | `report` по m_001, e_001, по дням, пустой период, период из двух месяцев | 414.85 / 6 / 9.0 / 0.83; 83.6 / 2 / 41.8 / 2025-11-03; 2 дня; нули; VALIDATION_ERROR | m_001: 414.85 / 6 / 9.0 / 0.83; e_001: 83.6 / 2 / 41.8 / 2025-11-03; по дням: 2; пустой период: 0 | да |
+| T3-13 Повторы и конфликты | тот же ключ с другим телом; отмена SUCCESS и DECLINED; второй платёж по QR в CREATED; сверка через 5 и 20 минут; неизвестный платёж | IDEMPOTENCY_CONFLICT; CANCEL_NOT_ALLOWED; PAYMENT_IN_PROGRESS; пусто, затем DECLINED / GATEWAY_TIMEOUT; NOT_FOUND | IDEMPOTENCY_CONFLICT; CANCEL_NOT_ALLOWED; PAYMENT_IN_PROGRESS; сверка через 5 мин: [], через 20 мин: [p_0101] → DECLINED; NOT_FOUND | да |
 
 ## Ограничения прототипа
 

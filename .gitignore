@@ -8,3 +8,5 @@ prototype/payments_out.csv
 prototype/audit_out.csv
 *.part
 .~lock.*
+docs/appendix/appendix.html
+docs/appendix/appendix.pdf
