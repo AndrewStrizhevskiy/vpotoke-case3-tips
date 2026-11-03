@@ -20,17 +20,18 @@
 ```
 case/                  материалы организаторов — НЕ редактируем, это эталон
 prototype/
-  04_прототип.py       консольный прототип (дорабатывает разработчик)
+  04_прототип.py       консольный прототип: qr, create, confirm, cancel, reconcile, report
   01_данные/           seed-CSV организаторов + MD5SUMS — НЕ меняем
 data/
   gateway_scenarios.csv  таблица сценариев эмулятора (ADR-001)
 api/
   05_api_schemas.yaml  заполненный OpenAPI (проходит openapi-spec-validator)
-diagrams/              схемы: system / states / er в .png, .svg, .drawio + генераторы
+diagrams/              схемы: system / states / er / dialog в .png, .svg + генераторы (.drawio — для первых трёх)
 docs/
   README.md            указатель ADR
   adr-00N-*.md         архитектурные решения
   a1-…, a2-…, a3-…     разделы A.1–A.3 приложения
+  06-qr-and-dialog.md  QR, генерация, диалоговая форма (4 экрана)
   b2-error-matrix.md   раздел B.2 приложения
   07-payment-emulator.md   заполненный шаблон 07
   11-security.md       заполненный шаблон 11_ИБ
@@ -42,10 +43,10 @@ docs/
 
 | Роль | Файлы | Статус |
 |-|-|-|
-| Архитектор | ADR-001…009, A.1–A.3, B.2, 05_api, 07, 11_ИБ, слайды 3–5 | черновики готовы, нужна командная вычитка |
-| Аналитик | [правила](docs/02-rules.md), [роли](docs/02-roles.md), [словарь данных](docs/03-data-dictionary.md), [требования](docs/04-requirements.md), [отчёты](docs/09-reports.md) | документы заполнены, расчёты проверены; нужна командная вычитка и согласование открытых вопросов |
-| Разработчик | 04_прототип.py, 03_тесты (факт), скриншоты | не начато |
-| Презентатор | слайды 1, 2, 6, 7, 8, сборка приложения, PDF | не начато |
+| Архитектор | ADR-001…009, A.1–A.3, B.2, 05_api, 07, 11_ИБ, [QR и диалог](docs/06-qr-and-dialog.md), команды `qr` и `report` прототипа, слайды 3–5 | готово, нужна командная вычитка |
+| Аналитик | [правила](docs/02-rules.md), [роли](docs/02-roles.md), [словарь данных](docs/03-data-dictionary.md), [требования](docs/04-requirements.md), [отчёты](docs/09-reports.md) | влито (PR #1), открытых вопросов нет; нужна командная вычитка |
+| Разработчик | прототип и тесты ([PR #3](https://github.com/AndrewStrizhevskiy/vpotoke-case3-tips/pull/3)), [03_тесты](docs/03-tests.md) | влито, 16 тестов из 16; остались скриншоты для приложения |
+| Презентатор | слайды 1, 2, 6, 7, 8, приложение, PDF | [PR #4](https://github.com/AndrewStrizhevskiy/vpotoke-case3-tips/pull/4): собранное приложение и план слайдов; слайды не написаны |
 
 Черновик слайдов 3–5: https://claude.ai/artifact/7Am3MXDGZ6bGuSUsDPhS4n
 (приватный: архитектор открывает доступ через Share).
@@ -63,9 +64,12 @@ python3 docs/checks/analyst_data.py
 cd diagrams && python3 build_system.py && python3 build_states.py && python3 build_er.py
 convert -density 192 system.svg system.png   # так же для states и er
 
-# запустить прототип (после доработки по docs/guides/developer.md)
+# прототип: тесты (16 из 16) и примеры команд
 export TIPS_HMAC_SECRET=demo-secret-k3
-python3 prototype/04_прототип.py qr.json
+python3 prototype/run_tests.py
+python3 prototype/04_прототип.py --now 2025-11-01T18:00:00Z qr req_qr.json      # выпуск QR на чек
+python3 prototype/04_прототип.py --now 2025-11-01T18:00:00Z pay req_pay.json    # создать и подтвердить платёж
+python3 prototype/04_прототип.py report --merchant m_001 --from 2025-11-01 --to 2025-11-30
 ```
 
 ## Правила команды

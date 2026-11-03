@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1760" height="1050" viewBox="0 0 1760 1050" font-family="Inter, 'DejaVu Sans', sans-serif" font-style="normal">
+<rect width="1760" height="1050" fill="#ffffff"/>
+<text x="40" y="56" font-size="28" font-weight="700" fill="#1B2430" text-anchor="start">Диалоговая форма чаевых — 4 экрана</text>
+<text x="40" y="86" font-size="16" font-weight="400" fill="#6A7179" text-anchor="start">клиент открывает ссылку из QR: пример qr_001, чек 637.00 ₽, чаевые 5 %</text>
+<text x="230.0" y="132" font-size="21" font-weight="700" fill="#2F5DA8" text-anchor="middle">1. Приветствие</text>
+<rect x="60" y="150" width="340" height="640" rx="34" fill="#ffffff" stroke="#1B2430" stroke-width="3"/>
+<rect x="186.0" y="164" width="88" height="8" rx="4" fill="#D5D8DD"/>
+<text x="88" y="220" font-size="22" font-weight="700" fill="#2F5DA8" text-anchor="start">Вкус-Сервис Тверская</text>
+<text x="88" y="248" font-size="17" font-weight="400" fill="#6A7179" text-anchor="start">чек r_1001</text>
+<rect x="88" y="290" width="284" height="150" rx="16" fill="#E3ECF9"/>
+<text x="108" y="332" font-size="17" font-weight="400" fill="#6A7179" text-anchor="start">Вас обслуживал(а)</text>
+<text x="108" y="368" font-size="28" font-weight="700" fill="#1B2430" text-anchor="start">Иванов И.</text>
+<text x="108" y="412" font-size="20" font-weight="400" fill="#1B2430" text-anchor="start">Сумма чека: 637.00 ₽</text>
+<text x="88" y="490" font-size="19" font-weight="400" fill="#1B2430" text-anchor="start">Оставьте чаевые официанту:</text>
+<text x="88" y="518" font-size="17" font-weight="400" fill="#6A7179" text-anchor="start">они пойдут лично ему на карту</text>
+<rect x="88" y="690" width="284" height="54" rx="14" fill="#2F5DA8"/>
+<text x="230.0" y="724.0" font-size="20" font-weight="600" fill="#ffffff" text-anchor="middle">Продолжить</text>
+<text x="230.0" y="822" font-size="15" font-weight="400" fill="#6A7179" text-anchor="middle">из QR: заведение, официант, чек и сумма из</text>
+<text x="230.0" y="842" font-size="15" font-weight="400" fill="#6A7179" text-anchor="middle">реестра кассы</text>
+<text x="650.0" y="132" font-size="21" font-weight="700" fill="#2F5DA8" text-anchor="middle">2. Выбор чаевых</text>
+<rect x="480" y="150" width="340" height="640" rx="34" fill="#ffffff" stroke="#1B2430" stroke-width="3"/>
+<rect x="606.0" y="164" width="88" height="8" rx="4" fill="#D5D8DD"/>
+<text x="508" y="214" font-size="24" font-weight="700" fill="#1B2430" text-anchor="start">Размер чаевых</text>
+<text x="508" y="244" font-size="18" font-weight="400" fill="#6A7179" text-anchor="start">Чек: 637.00 ₽</text>
+<rect x="508" y="280" width="88" height="48" rx="12" fill="#ffffff" stroke="#D5D8DD" stroke-width="2"/>
+<text x="552.0" y="311" font-size="20" font-weight="600" fill="#1B2430" text-anchor="middle">0 %</text>
+<rect x="606" y="280" width="88" height="48" rx="12" fill="#2F5DA8" stroke="#2F5DA8" stroke-width="2"/>
+<text x="650.0" y="311" font-size="20" font-weight="600" fill="#ffffff" text-anchor="middle">5 %</text>
+<rect x="704" y="280" width="88" height="48" rx="12" fill="#ffffff" stroke="#D5D8DD" stroke-width="2"/>
+<text x="748.0" y="311" font-size="20" font-weight="600" fill="#1B2430" text-anchor="middle">10 %</text>
+<rect x="508" y="340" width="88" height="48" rx="12" fill="#ffffff" stroke="#D5D8DD" stroke-width="2"/>
+<text x="552.0" y="371" font-size="20" font-weight="600" fill="#1B2430" text-anchor="middle">15 %</text>
+<rect x="606" y="340" width="88" height="48" rx="12" fill="#ffffff" stroke="#D5D8DD" stroke-width="2"/>
+<text x="650.0" y="371" font-size="20" font-weight="600" fill="#1B2430" text-anchor="middle">20 %</text>
+<rect x="704" y="340" width="88" height="48" rx="12" fill="#ffffff" stroke="#D5D8DD" stroke-width="2"/>
+<text x="748.0" y="371" font-size="20" font-weight="600" fill="#1B2430" text-anchor="middle">Своя</text>
+<rect x="508" y="430" width="284" height="170" rx="16" fill="#F6F5F1"/>
+<text x="528" y="472" font-size="19" font-weight="400" fill="#6A7179" text-anchor="start">Чек</text>
+<text x="772" y="472" font-size="19" font-weight="400" fill="#6A7179" text-anchor="end">637.00 ₽</text>
+<text x="528" y="506" font-size="19" font-weight="400" fill="#6A7179" text-anchor="start">Чаевые 5 %</text>
+<text x="772" y="506" font-size="19" font-weight="400" fill="#6A7179" text-anchor="end">31.85 ₽</text>
+<line x1="528" y1="526" x2="772" y2="526" stroke="#D5D8DD" stroke-width="2"/>
+<text x="528" y="566" font-size="19" font-weight="700" fill="#1B2430" text-anchor="start">Итого</text>
+<text x="772" y="566" font-size="19" font-weight="700" fill="#1B2430" text-anchor="end">668.85 ₽</text>
+<text x="508" y="632" font-size="16" font-weight="400" fill="#6A7179" text-anchor="start">«Своя» — любая сумма до 50 % чека</text>
+<rect x="508" y="690" width="284" height="54" rx="14" fill="#2F5DA8"/>
+<text x="650.0" y="724.0" font-size="20" font-weight="600" fill="#ffffff" text-anchor="middle">Оплатить</text>
+<text x="650.0" y="822" font-size="15" font-weight="400" fill="#6A7179" text-anchor="middle">проценты 0–20 % или своя сумма; итог</text>
+<text x="650.0" y="842" font-size="15" font-weight="400" fill="#6A7179" text-anchor="middle">пересчитывается сразу</text>
+<text x="1070.0" y="132" font-size="21" font-weight="700" fill="#2F5DA8" text-anchor="middle">3. Подтверждение</text>
+<rect x="900" y="150" width="340" height="640" rx="34" fill="#ffffff" stroke="#1B2430" stroke-width="3"/>
+<rect x="1026.0" y="164" width="88" height="8" rx="4" fill="#D5D8DD"/>
+<text x="928" y="214" font-size="24" font-weight="700" fill="#1B2430" text-anchor="start">Подтвердите оплату</text>
+<rect x="928" y="250" width="284" height="230" rx="16" fill="#F6F5F1"/>
+<text x="948" y="298" font-size="19" font-weight="400" fill="#6A7179" text-anchor="start">Заведение</text>
+<text x="1192" y="298" font-size="19" font-weight="400" fill="#6A7179" text-anchor="end">Тверская</text>
+<text x="948" y="340" font-size="19" font-weight="400" fill="#6A7179" text-anchor="start">Официант</text>
+<text x="1192" y="340" font-size="19" font-weight="400" fill="#6A7179" text-anchor="end">Иванов И.</text>
+<text x="948" y="382" font-size="19" font-weight="400" fill="#1B2430" text-anchor="start">Чек</text>
+<text x="1192" y="382" font-size="19" font-weight="400" fill="#1B2430" text-anchor="end">637.00 ₽</text>
+<text x="948" y="420" font-size="19" font-weight="400" fill="#1B2430" text-anchor="start">Чаевые</text>
+<text x="1192" y="420" font-size="19" font-weight="400" fill="#1B2430" text-anchor="end">31.85 ₽</text>
+<line x1="948" y1="438" x2="1192" y2="438" stroke="#D5D8DD" stroke-width="2"/>
+<text x="948" y="466" font-size="19" font-weight="700" fill="#1B2430" text-anchor="start">К оплате</text>
+<text x="1192" y="466" font-size="19" font-weight="700" fill="#1B2430" text-anchor="end">668.85 ₽</text>
+<text x="928" y="522" font-size="16" font-weight="400" fill="#6A7179" text-anchor="start">Нажимая кнопку, вы подтверждаете</text>
+<text x="928" y="544" font-size="16" font-weight="400" fill="#6A7179" text-anchor="start">списание всей суммы с карты</text>
+<rect x="928" y="630" width="284" height="54" rx="14" fill="#2F5DA8"/>
+<text x="1070.0" y="664.0" font-size="20" font-weight="600" fill="#ffffff" text-anchor="middle">Подтвердить оплату</text>
+<text x="1070.0" y="720" font-size="20" font-weight="600" fill="#2F5DA8" text-anchor="middle">Назад</text>
+<text x="1070.0" y="822" font-size="15" font-weight="400" fill="#6A7179" text-anchor="middle">последний взгляд на суммы; кнопка создаёт и</text>
+<text x="1070.0" y="842" font-size="15" font-weight="400" fill="#6A7179" text-anchor="middle">подтверждает платёж</text>
+<text x="1490.0" y="132" font-size="21" font-weight="700" fill="#2F5DA8" text-anchor="middle">4. Результат</text>
+<rect x="1320" y="150" width="340" height="640" rx="34" fill="#ffffff" stroke="#1B2430" stroke-width="3"/>
+<rect x="1446.0" y="164" width="88" height="8" rx="4" fill="#D5D8DD"/>
+<circle cx="1490.0" cy="320" r="58" fill="#E6F4EA"/>
+<path d="M1464.0,322 L1483.0,342 L1518.0,300" fill="none" stroke="#2F7D43" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1490.0" y="438" font-size="30" font-weight="700" fill="#2F7D43" text-anchor="middle">Спасибо!</text>
+<text x="1490.0" y="478" font-size="22" font-weight="600" fill="#1B2430" text-anchor="middle">Чаевые отправлены</text>
+<text x="1490.0" y="522" font-size="18" font-weight="400" fill="#6A7179" text-anchor="middle">668.85 ₽ · чек r_1001</text>
+<rect x="1348" y="690" width="284" height="54" rx="14" fill="#ffffff"/>
+<text x="1490.0" y="724.0" font-size="20" font-weight="600" fill="#2F5DA8" text-anchor="middle">Готово</text>
+<rect x="1348" y="690" width="284" height="54" rx="14" fill="none" stroke="#2F5DA8" stroke-width="2"/>
+<text x="1490.0" y="822" font-size="15" font-weight="400" fill="#6A7179" text-anchor="middle">три исхода: успех, отказ, таймаут — формулировки</text>
+<text x="1490.0" y="842" font-size="15" font-weight="400" fill="#6A7179" text-anchor="middle">из ADR-006</text>
+<polygon points="414,460.0 466,470.0 414,480.0" fill="#D5D8DD"/>
+<polygon points="834,460.0 886,470.0 834,480.0" fill="#D5D8DD"/>
+<polygon points="1254,460.0 1306,470.0 1254,480.0" fill="#D5D8DD"/>
+<text x="60" y="898" font-size="20" font-weight="700" fill="#1B2430" text-anchor="start">Экран 4: другие исходы</text>
+<rect x="60" y="920" width="535" height="92" rx="14" fill="#FDEEEE" stroke="#C0392B" stroke-width="1.5"/>
+<text x="82" y="954" font-size="20" font-weight="700" fill="#C0392B" text-anchor="start">Отказ шлюза</text>
+<text x="573" y="954" font-size="17" font-weight="400" fill="#C0392B" text-anchor="end">402 CARD_DECLINED</text>
+<text x="82" y="988" font-size="19" font-weight="400" fill="#1B2430" text-anchor="start">Оплата не прошла, попробуйте другой способ</text>
+<rect x="620" y="920" width="535" height="92" rx="14" fill="#FFF3E3" stroke="#B5651D" stroke-width="1.5"/>
+<text x="642" y="954" font-size="20" font-weight="700" fill="#B5651D" text-anchor="start">Таймаут шлюза</text>
+<text x="1133" y="954" font-size="17" font-weight="400" fill="#B5651D" text-anchor="end">202 GATEWAY_TIMEOUT</text>
+<text x="642" y="988" font-size="19" font-weight="400" fill="#1B2430" text-anchor="start">Обрабатываем, проверьте через минуту</text>
+<rect x="1180" y="920" width="535" height="92" rx="14" fill="#F1F3F5" stroke="#6A7179" stroke-width="1.5"/>
+<text x="1202" y="954" font-size="20" font-weight="700" fill="#6A7179" text-anchor="start">QR устарел</text>
+<text x="1693" y="954" font-size="17" font-weight="400" fill="#6A7179" text-anchor="end">410 QR_EXPIRED</text>
+<text x="1202" y="988" font-size="19" font-weight="400" fill="#1B2430" text-anchor="start">QR устарел, попросите официанта новый</text>
+</svg>

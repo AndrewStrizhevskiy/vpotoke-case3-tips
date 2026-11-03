@@ -8,6 +8,8 @@ CLI-прототип платформы чаевых — кейс 3.
     confirm  payment_id   CREATED -> PENDING -> итог эмулятора
     cancel   payment_id   CREATED -> CANCELED (иначе CANCEL_NOT_ALLOWED; повтор отмены — 200)
     reconcile             сверка: PENDING старше 15 минут -> DECLINED (GATEWAY_TIMEOUT)
+    qr       req.json     выпуск QR на чек: nonce, срок 24 ч, подпись, платёжная ссылка (FR-1)
+    report   --merchant|--employee --from --to [--daily]   отчёты по payments (ADR-007)
 
 Параметры: --now ISO-время UTC, --qr-file путь к qr_links.csv, --out-dir каталог для *_out.csv.
 Секрет подписи берётся только из переменной окружения TIPS_HMAC_SECRET.
@@ -25,6 +27,9 @@ import hmac
 import json
 import os
 import re
+import secrets
+import shutil
+import subprocess
 import sys
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -33,9 +38,13 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "01_данные")
 SCENARIOS_CSV = os.path.join(BASE_DIR, "..", "data", "gateway_scenarios.csv")
+PAY_URL = "https://tips.example/pay"
+QR_TTL = timedelta(hours=24)
 
 SEED_FIELDS = ["payment_id", "merchant_id", "employee_id", "amount", "tip", "status", "timestamp"]
 OUT_FIELDS = SEED_FIELDS + ["qr_id", "idempotency_key", "amount_total", "error_code"]
+QR_FIELDS = ["qr_id", "merchant_id", "employee_id", "receipt_id", "nonce", "exp", "signature"]
+RECEIPT_FIELDS = ["merchant_id", "receipt_id", "amount", "currency"]
 AUDIT_FIELDS = ["event_id", "payment_id", "qr_id", "action", "from_status", "to_status",
                 "amount_total", "actor", "at"]
 
@@ -51,7 +60,7 @@ ERRORS = {
     "VALIDATION_ERROR": 400, "INVALID_QR": 422, "QR_EXPIRED": 410, "QR_USED": 409,
     "MERCHANT_BLOCKED": 403, "RECEIPT_MISMATCH": 422, "AMOUNT_MISMATCH": 422, "AMOUNT_OUT_OF_RANGE": 422,
     "TIP_OUT_OF_RANGE": 422, "IDEMPOTENCY_CONFLICT": 409, "PAYMENT_IN_PROGRESS": 409,
-    "CANCEL_NOT_ALLOWED": 409, "PAYMENT_STATE_CONFLICT": 409, "NOT_FOUND": 404,
+    "CANCEL_NOT_ALLOWED": 409, "PAYMENT_STATE_CONFLICT": 409, "NOT_FOUND": 404, "ACCESS_DENIED": 403,
 }
 
 
@@ -91,6 +100,29 @@ def load_merchant_status(merchant_id):
     for row in read_csv(os.path.join(DATA_DIR, "merchants.csv")):
         if row["merchant_id"] == merchant_id:
             return row["status"]
+    return None
+
+
+def load_employee(employee_id):
+    for row in read_csv(os.path.join(DATA_DIR, "employees.csv")):
+        if row["employee_id"] == employee_id:
+            return row
+    return None
+
+
+def find_qr(qr_file, store, qr_id):
+    """QR из qr_file (seed), затем выпущенные прототипом (qr_out.csv)."""
+    return load_qr(qr_file, qr_id) or next((r for r in store.qrs() if r["qr_id"] == qr_id), None)
+
+
+def receipt_amount(store, merchant_id, receipt_id):
+    """ADR-003: сумма чека из реестра: сначала чеки, добавленные при выпуске QR, затем seed."""
+    for row in store.receipts():
+        if row["merchant_id"] == merchant_id and row["receipt_id"] == receipt_id:
+            return Decimal(row["amount"])
+    for row in read_csv(os.path.join(DATA_DIR, "qr_links.csv")):
+        if row["merchant_id"] == merchant_id and row["receipt_id"] == receipt_id:
+            return load_receipt_amount(row["qr_id"])
     return None
 
 
@@ -168,6 +200,24 @@ class Store:
     def __init__(self, out_dir):
         self.payments_path = os.path.join(out_dir, "payments_out.csv")
         self.audit_path = os.path.join(out_dir, "audit_out.csv")
+        self.qr_path = os.path.join(out_dir, "qr_out.csv")
+        self.receipts_path = os.path.join(out_dir, "receipts_out.csv")
+        self.png_dir = os.path.join(out_dir, "qr_png")
+
+    def qrs(self):
+        return read_csv(self.qr_path) if os.path.exists(self.qr_path) else []
+
+    def receipts(self):
+        return read_csv(self.receipts_path) if os.path.exists(self.receipts_path) else []
+
+    @staticmethod
+    def append_row(path, fields, row):
+        new_file = not os.path.exists(path)
+        with open(path, "a", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fields)
+            if new_file:
+                w.writeheader()
+            w.writerow(row)
 
     def payments(self):
         return read_csv(self.payments_path) if os.path.exists(self.payments_path) else []
@@ -253,7 +303,7 @@ def create_payment(req, secret, qr_file, store, now):
         raise PaymentError("VALIDATION_ERROR")
 
     # Q-1. Неизвестный qr_id и плохая подпись дают один ответ: перебор id ничего не раскрывает.
-    qr = load_qr(qr_file, qr_id)
+    qr = find_qr(qr_file, store, qr_id)
     if qr is None or not verify_signature(secret, qr, req.get("sig")):
         raise PaymentError("INVALID_QR")
 
@@ -280,7 +330,7 @@ def create_payment(req, secret, qr_file, store, now):
         raise PaymentError("RECEIPT_MISMATCH")
 
     # Сумма чека — серверная правда (ADR-003), затем P-1, Q-6, P-3
-    receipt = load_receipt_amount(qr_id)
+    receipt = receipt_amount(store, qr["merchant_id"], qr["receipt_id"])
     if receipt is None:
         raise PaymentError("NOT_FOUND")
     if base != receipt:
@@ -331,7 +381,7 @@ def confirm_payment(payment, qr_file, store, now):
     if status != "CREATED":  # повтор: текущий статус и прежний код, шлюз не вызывается
         return payment
     store.transition(payment, "PENDING", None, "payment_submitted", "client", now)
-    qr = load_qr(qr_file, payment["qr_id"])
+    qr = find_qr(qr_file, store, payment["qr_id"])
     result, error = emulate_gateway(payment["qr_id"], qr["nonce"], load_scenarios())
     if result == "SUCCESS":
         store.transition(payment, "SUCCESS", None, "payment_confirmed", "system", now)
@@ -368,6 +418,137 @@ def reconcile(store, now):
     return closed
 
 
+# ---------- выпуск QR (FR-1) ----------
+
+def validate_qr_request(req):
+    """Формат запроса на выпуск QR; сумма чека приходит от кассы (в прототипе — из запроса)."""
+    if not isinstance(req, dict):
+        raise PaymentError("VALIDATION_ERROR")
+    for key, pattern in (("merchant_id", r"m_\d{3}"), ("employee_id", r"e_\d{3}"), ("receipt_id", r"r_\d{4}")):
+        if not isinstance(req.get(key), str) or not re.fullmatch(pattern, req[key]):
+            raise PaymentError("VALIDATION_ERROR")
+    if "amount" not in req or isinstance(req["amount"], bool):
+        raise PaymentError("VALIDATION_ERROR")
+    return to_money(req["amount"])
+
+
+def qr_result(qr, store, new):
+    """Платёжная ссылка с подписью (ADR-003) и, если установлен qrencode, PNG с QR-кодом."""
+    url = f"{PAY_URL}?qr={qr['qr_id']}&sig={qr['signature']}"
+    png = None
+    if shutil.which("qrencode"):
+        os.makedirs(store.png_dir, exist_ok=True)
+        path = os.path.join(store.png_dir, qr["qr_id"] + ".png")
+        done = subprocess.run(["qrencode", "-o", path, "-s", "8", url], capture_output=True)
+        png = path if done.returncode == 0 else None
+    return {"qr_id": qr["qr_id"], "pay_url": url, "exp": qr["exp"], "new": new, "png": png}
+
+
+def create_qr(req, secret, qr_file, store, now):
+    """Выпуск QR на чек. Проверки: мерчант ACTIVE, официант этого мерчанта, чек не меняет сумму."""
+    amount = validate_qr_request(req)
+    merchant_id, employee_id, receipt_id = req["merchant_id"], req["employee_id"], req["receipt_id"]
+    status = load_merchant_status(merchant_id)
+    if status is None:
+        raise PaymentError("NOT_FOUND")
+    if status != "ACTIVE":
+        raise PaymentError("MERCHANT_BLOCKED")
+    employee = load_employee(employee_id)
+    if employee is None:
+        raise PaymentError("NOT_FOUND")
+    if employee["merchant_id"] != merchant_id:
+        raise PaymentError("ACCESS_DENIED")
+    if not (0 < amount <= MAX_BASE):
+        raise PaymentError("AMOUNT_OUT_OF_RANGE")
+    known = receipt_amount(store, merchant_id, receipt_id)
+    if known is not None and known != amount:
+        raise PaymentError("AMOUNT_MISMATCH")
+
+    rows = read_csv(qr_file) + store.qrs()
+    for row in rows:  # на чек уже есть действующий QR — отдаём его, а не выпускаем второй
+        if row["merchant_id"] == merchant_id and row["receipt_id"] == receipt_id \
+                and parse_time(row["exp"]) >= now:
+            if row["employee_id"] != employee_id:
+                raise PaymentError("ACCESS_DENIED")
+            return qr_result(row, store, new=False)
+
+    last = max((int(r["qr_id"][3:]) for r in rows), default=0)
+    qr = {"qr_id": f"qr_{last + 1:03d}", "merchant_id": merchant_id, "employee_id": employee_id,
+          "receipt_id": receipt_id, "nonce": secrets.token_hex(3),
+          "exp": (now + QR_TTL).strftime(TIME_FMT)}
+    qr["signature"] = compute_signature(secret, qr)
+    if known is None:  # касса передала новый чек
+        store.append_row(store.receipts_path, RECEIPT_FIELDS,
+                         {"merchant_id": merchant_id, "receipt_id": receipt_id, "amount": fmt(amount), "currency": "RUB"})
+    store.append_row(store.qr_path, QR_FIELDS, qr)
+    return qr_result(qr, store, new=True)
+
+
+# ---------- отчёты (ADR-007) ----------
+
+def parse_day(text):
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        raise PaymentError("VALIDATION_ERROR")
+
+
+def round_money(value):
+    return float(value.quantize(CENT, rounding=ROUND_HALF_UP))
+
+
+def report_metrics(rows):
+    """Чаевые и средние — только по SUCCESS, количество попыток и доля успеха — по всем."""
+    success = [r for r in rows if r["status"] == "SUCCESS"]
+    tips = sum((Decimal(r["tip"]) for r in success), Decimal(0))
+    percent = sum((Decimal(r["tip"]) / Decimal(r["amount"]) * 100 for r in success), Decimal(0))
+    by_day = {}
+    for r in success:
+        by_day[r["timestamp"][:10]] = by_day.get(r["timestamp"][:10], Decimal(0)) + Decimal(r["tip"])
+    best = max(by_day.values()) if by_day else None
+    return {
+        "tips_total": round_money(tips),
+        "payments_count": len(rows),
+        "avg_tip_pct": round_money(percent / len(success)) if success else None,
+        "avg_tip_amount": round_money(tips / len(success)) if success else None,
+        "success_rate": round_money(Decimal(len(success)) / len(rows)) if rows else 0.0,
+        "top_day": min(d for d in by_day if by_day[d] == best) if by_day else None,
+    }
+
+
+def build_report(store, merchant_id, employee_id, from_text, to_text, daily):
+    """Отчёт по мерчанту, официанту или по дням. Payment = seed payments.csv + payments_out.csv."""
+    if bool(merchant_id) == bool(employee_id) or (daily and not merchant_id):
+        raise PaymentError("VALIDATION_ERROR")
+    first, last = parse_day(from_text), parse_day(to_text)
+    if first > last:
+        raise PaymentError("VALIDATION_ERROR")
+    if merchant_id and load_merchant_status(merchant_id) is None:
+        raise PaymentError("NOT_FOUND")
+    if employee_id and not load_employee(employee_id):
+        raise PaymentError("NOT_FOUND")
+    key, owner = ("merchant_id", merchant_id) if merchant_id else ("employee_id", employee_id)
+    rows = [r for r in read_csv(os.path.join(DATA_DIR, "payments.csv")) + store.payments()
+            if r[key] == owner and first.isoformat() <= r["timestamp"][:10] <= last.isoformat()]
+    if daily:
+        days = sorted({r["timestamp"][:10] for r in rows})
+        items = []
+        for day in days:
+            m = report_metrics([r for r in rows if r["timestamp"][:10] == day])
+            items.append({"date": day, "tips_total": m["tips_total"],
+                          "payments_count": m["payments_count"], "avg_tip_pct": m["avg_tip_pct"]})
+        return {"merchant_id": merchant_id, "daily": items}
+    period = first.strftime("%Y-%m")
+    if period != last.strftime("%Y-%m"):  # формат period для произвольного интервала в API не определён
+        raise PaymentError("VALIDATION_ERROR")
+    m = report_metrics(rows)
+    if merchant_id:
+        return {"merchant_id": merchant_id, "period": period, **{k: m[k] for k in
+                ("tips_total", "payments_count", "avg_tip_pct", "success_rate")}}
+    return {"employee_id": employee_id, "period": period, **{k: m[k] for k in
+            ("tips_total", "payments_count", "avg_tip_amount", "top_day")}}
+
+
 # ---------- CLI ----------
 
 def money_json(value):
@@ -397,12 +578,19 @@ def main():
     parser.add_argument("--now", help="текущее время UTC, например 2025-11-01T18:00:00Z")
     parser.add_argument("--qr-file", default=os.path.join(DATA_DIR, "qr_links.csv"))
     parser.add_argument("--out-dir", default=BASE_DIR)
-    parser.add_argument("args", nargs="+", help="[pay|create|confirm|cancel|reconcile] аргумент")
+    parser.add_argument("--merchant", help="report: merchant_id, например m_001")
+    parser.add_argument("--employee", help="report: employee_id, например e_001")
+    parser.add_argument("--from", dest="from_date", help="report: первый день YYYY-MM-DD (включительно)")
+    parser.add_argument("--to", dest="to_date", help="report: последний день YYYY-MM-DD (включительно)")
+    parser.add_argument("--daily", action="store_true", help="report: разбивка по дням для --merchant")
+    parser.add_argument("args", nargs="*", help="[pay|create|confirm|cancel|reconcile|qr|report] аргумент")
     ns = parser.parse_args()
 
-    commands = ("pay", "create", "confirm", "cancel", "reconcile")
+    commands = ("pay", "create", "confirm", "cancel", "reconcile", "qr", "report")
+    if not ns.args:
+        parser.error("нужна команда")
     cmd, rest = (ns.args[0], ns.args[1:]) if ns.args[0] in commands else ("pay", ns.args)
-    secret = get_secret()
+    secret = get_secret() if cmd in ("pay", "create", "qr") else None
     store = Store(ns.out_dir)
 
     try:
@@ -413,14 +601,20 @@ def main():
         if cmd == "reconcile":
             emit({"closed": reconcile(store, now)})
             sys.exit(0)
+        if cmd == "report":
+            emit(build_report(store, ns.merchant, ns.employee, ns.from_date, ns.to_date, ns.daily))
+            sys.exit(0)
         if len(rest) != 1:
             parser.error(f"команде {cmd} нужен один аргумент")
-        if cmd in ("pay", "create"):
+        if cmd in ("pay", "create", "qr"):
             try:
                 with open(rest[0], encoding="utf-8") as f:
                     req = json.load(f, parse_float=Decimal)
             except (OSError, ValueError):
                 raise PaymentError("VALIDATION_ERROR")
+            if cmd == "qr":
+                emit(create_qr(req, secret, ns.qr_file, store, now))
+                sys.exit(0)
             payment, replay = create_payment(req, secret, ns.qr_file, store, now)
             if cmd == "pay" and not replay:
                 payment = confirm_payment(payment, ns.qr_file, store, now)
