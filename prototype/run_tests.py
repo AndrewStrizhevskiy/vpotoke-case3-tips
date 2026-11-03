@@ -36,7 +36,8 @@ class Env:
         return proc.returncode, json.loads(proc.stdout) if proc.stdout.strip() else {}
 
     def req(self, **body):
-        body.setdefault("receipt_id", "r_%d" % (1000 + int(body["qr_id"][3:])))  # qr_001 -> r_1001
+        if "qr_id" in body:  # запрос платежа: чек по умолчанию — чек этого QR (qr_001 -> r_1001)
+            body.setdefault("receipt_id", "r_%d" % (1000 + int(body["qr_id"][3:])))
         path = os.path.join(self.dir, f"req_{len(os.listdir(self.dir))}.json")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(body, f)
@@ -189,9 +190,76 @@ def t9():
     return ok, f"код {code}, {out['error_code']}, строк: {len(e.rows())}"
 
 
+def qr_req(e, **over):
+    body = dict(merchant_id="m_001", employee_id="e_001", receipt_id="r_2001", amount=1250.50)
+    body.update(over)
+    return e.req(**body)
+
+
+def sig_from(url):
+    return url.split("sig=")[1]
+
+
+def t10():
+    """FR-1: QR выпущен -> по его ссылке создаётся платёж; повторный выпуск на тот же чек возвращает тот же QR."""
+    e = Env()
+    code, qr = e.run("qr", qr_req(e))
+    again_code, again = e.run("qr", qr_req(e))
+    pay = dict(qr_id=qr["qr_id"], sig=sig_from(qr["pay_url"]), receipt_id="r_2001", base_amount=1250.50,
+               tip_pct=10, idempotency_key="k-10")
+    code2, created = e.run("create", e.req(**pay))
+    pay.update(base_amount=1250.00, idempotency_key="k-10b")
+    code3, wrong = e.run("create", e.req(**pay))
+    ok = (code == 0 and qr["new"] and qr["qr_id"] == "qr_101" and again_code == 0 and not again["new"]
+          and again["qr_id"] == qr["qr_id"] and code2 == 0 and created["status"] == "CREATED"
+          and created["tip_amount"] == 125.05 and created["amount_total"] == 1375.55
+          and code3 == 2 and wrong["error_code"] == "AMOUNT_MISMATCH")
+    return ok, (f"{qr['qr_id']} новый, повтор: {again['qr_id']} (new={again['new']}); платёж {created['status']}, "
+                f"итог {created['amount_total']}; другая сумма: {wrong['error_code']}")
+
+
+def t11():
+    """Проверки при выпуске QR: заблокированный мерчант, чужой официант, другая сумма чека, формат."""
+    e = Env()
+    c1, o1 = e.run("qr", qr_req(e, merchant_id="m_019", employee_id="e_055"))
+    c2, o2 = e.run("qr", qr_req(e, employee_id="e_004"))
+    c3, o3 = e.run("qr", qr_req(e, receipt_id="r_1001", amount=700))
+    c4, o4 = e.run("qr", qr_req(e, merchant_id="m1"))
+    ok = (c1 == 2 and o1["error_code"] == "MERCHANT_BLOCKED" and c2 == 2 and o2["error_code"] == "ACCESS_DENIED"
+          and c3 == 2 and o3["error_code"] == "AMOUNT_MISMATCH" and c4 == 2 and o4["error_code"] == "VALIDATION_ERROR"
+          and not os.path.exists(os.path.join(e.dir, "qr_out.csv")))
+    return ok, f"{o1['error_code']}, {o2['error_code']}, {o3['error_code']}, {o4['error_code']}; QR не выпущен"
+
+
+def report(e, *args):
+    return e.run("report", *args)
+
+
+def t12():
+    """Отчёты сходятся с payments.csv и ADR-007: мерчант, официант, по дням, пустой период."""
+    e = Env()
+    _, m = report(e, "--merchant", "m_001", "--from", "2025-11-01", "--to", "2025-11-30")
+    _, w = report(e, "--employee", "e_001", "--from", "2025-11-01", "--to", "2025-11-30")
+    _, d = report(e, "--merchant", "m_001", "--daily", "--from", "2025-11-01", "--to", "2025-11-30")
+    _, z = report(e, "--merchant", "m_001", "--from", "2025-12-01", "--to", "2025-12-31")
+    code, bad = report(e, "--merchant", "m_001", "--from", "2025-11-01", "--to", "2025-12-31")
+    ok = (m == {"merchant_id": "m_001", "period": "2025-11", "tips_total": 414.85, "payments_count": 6,
+                "avg_tip_pct": 9.0, "success_rate": 0.83}
+          and w == {"employee_id": "e_001", "period": "2025-11", "tips_total": 83.6, "payments_count": 2,
+                    "avg_tip_amount": 41.8, "top_day": "2025-11-03"}
+          and d["daily"] == [{"date": "2025-11-01", "tips_total": 245.9, "payments_count": 3, "avg_tip_pct": 10.0},
+                             {"date": "2025-11-03", "tips_total": 168.95, "payments_count": 3, "avg_tip_pct": 7.5}]
+          and z["tips_total"] == 0.0 and z["payments_count"] == 0 and z["avg_tip_pct"] is None
+          and z["success_rate"] == 0.0 and code == 2 and bad["error_code"] == "VALIDATION_ERROR")
+    return ok, (f"m_001: {m['tips_total']} / {m['payments_count']} / {m['avg_tip_pct']} / {m['success_rate']}; "
+                f"e_001: {w['tips_total']} / {w['payments_count']} / {w['avg_tip_amount']} / {w['top_day']}; "
+                f"по дням: {len(d['daily'])}; пустой период: {z['payments_count']}")
+
+
 TESTS = [("T3-1 Успех", t1), ("T3-2 Отказ", t2), ("T3-3 Неверный QR", t3), ("T3-3б QR истёк", t3b), ("T3-3в Чужой чек", t3c),
          ("T3-4 Повтор", t4), ("T3-4б Повтор после оплаты", t4b), ("T3-5 Отмена", t5), ("T3-5б Повторные действия", t5b), ("T3-6 Таймаут", t6), ("T3-7 Блокировка", t7),
-         ("T3-8 Чаевые > 50 %", t8), ("T3-9 Повторная оплата", t9)]
+         ("T3-8 Чаевые > 50 %", t8), ("T3-9 Повторная оплата", t9),
+         ("T3-10 Выпуск QR", t10), ("T3-11 Проверки выпуска QR", t11), ("T3-12 Отчёты", t12)]
 
 
 def main():
