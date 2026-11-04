@@ -412,8 +412,8 @@ paths:
           description: PENDING, GATEWAY_TIMEOUT — опросить GET /payments/{id}
           content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
         '402':
-          description: DECLINED, CARD_DECLINED
-          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+          description: DECLINED, error_code CARD_DECLINED — платёж с итоговым статусом, а не ошибка запроса
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
 

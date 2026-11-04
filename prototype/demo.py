@@ -68,6 +68,12 @@ def describe(out):
         return "SUCCESS", f"{out['qr_id']}  новый={'да' if out['new'] else 'нет'}  до {out['exp']}{png}\n    {out['pay_url']}"
     if "closed" in out:
         return "SUCCESS", f"сверка закрыла: {', '.join(out['closed']) or 'ничего'}"
+    if "daily" in out:
+        days = "; ".join(f"{d['date'][5:]}: {d['tips_total']:.2f} ₽ ({d['payments_count']})" for d in out["daily"])
+        return "SUCCESS", f"{out['merchant_id']}  по дням: {days}"
+    if "top_day" in out:
+        return "SUCCESS", (f"{out['employee_id']}  {out['period']}: чаевые {out['tips_total']:.2f} ₽, платежей {out['payments_count']}, "
+                           f"средний чек чаевых {out['avg_tip_amount']:.2f} ₽, лучший день {out['top_day']}")
     if "tips_total" in out:
         return "SUCCESS", (f"{out['merchant_id']}  {out['period']}: чаевые {out['tips_total']:.2f} ₽, платежей {out['payments_count']}, "
                            f"средний процент {out['avg_tip_pct']}, доля успешных {out['success_rate']}")
@@ -144,10 +150,14 @@ def main():
     code, out = run(tmp, "cancel", created["payment_id"])
     show(f"cancel {created['payment_id']}", code, out)
 
-    step(8, "Отчёт по заведению m_001, ноябрь 2025", "по исходному payments.csv: чаевые только по успешным платежам")
+    step(8, "Отчёты за ноябрь 2025: заведение, официант, дни", "по исходному payments.csv: чаевые только по успешным платежам")
     clean = tempfile.mkdtemp(prefix="tips_demo_seed_")
     code, out = run(clean, "report", "--merchant", "m_001", "--from", "2025-11-01", "--to", "2025-11-30")
     show("report --merchant m_001 --from 2025-11-01 --to 2025-11-30", code, out)
+    code, out = run(clean, "report", "--employee", "e_001", "--from", "2025-11-01", "--to", "2025-11-30")
+    show("report --employee e_001 --from 2025-11-01 --to 2025-11-30", code, out)
+    code, out = run(clean, "report", "--merchant", "m_001", "--daily", "--from", "2025-11-01", "--to", "2025-11-30")
+    show("report --merchant m_001 --daily --from 2025-11-01 --to 2025-11-30", code, out)
 
     step(9, "Журнал аудита", "каждый переход статуса — отдельное событие")
     for ev in rows(tmp, "audit_out.csv"):
