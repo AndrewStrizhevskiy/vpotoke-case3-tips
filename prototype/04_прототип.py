@@ -57,11 +57,22 @@ RECONCILE_AFTER = timedelta(minutes=15)
 
 # Ошибка -> (HTTP-аналог из ADR-006, код выхода процесса)
 ERRORS = {
-    "VALIDATION_ERROR": 400, "INVALID_QR": 422, "QR_EXPIRED": 410, "QR_USED": 409,
-    "MERCHANT_BLOCKED": 403, "RECEIPT_MISMATCH": 422, "AMOUNT_MISMATCH": 422, "AMOUNT_OUT_OF_RANGE": 422,
-    "TIP_OUT_OF_RANGE": 422, "IDEMPOTENCY_CONFLICT": 409, "PAYMENT_IN_PROGRESS": 409,
-    "CANCEL_NOT_ALLOWED": 409, "PAYMENT_STATE_CONFLICT": 409, "NOT_FOUND": 404, "ACCESS_DENIED": 403,
-}
+    "VALIDATION_ERROR": (400, False, "Неверный формат запроса"),
+    "INVALID_QR": (422, False, "Не удалось открыть оплату"),
+    "QR_EXPIRED": (410, True, "QR устарел, попросите официанта новый"),
+    "QR_USED": (409, False, "Этот чек уже оплачен"),
+    "MERCHANT_BLOCKED": (403, False, "Оплата в заведении недоступна"),
+    "RECEIPT_MISMATCH": (422, False, "Не удалось открыть оплату"),
+    "AMOUNT_MISMATCH": (422, False, "Сумма чека изменилась, обновите страницу"),
+    "AMOUNT_OUT_OF_RANGE": (422, False, "Некорректная сумма"),
+    "TIP_OUT_OF_RANGE": (422, True, "Чаевые — не больше 50 % от чека"),
+    "IDEMPOTENCY_CONFLICT": (409, False, "Обновите страницу"),
+    "PAYMENT_IN_PROGRESS": (409, True, "Оплата уже обрабатывается"),
+    "CANCEL_NOT_ALLOWED": (409, False, "Отмена невозможна: оплата уже отправлена в банк или закрыта"),
+    "PAYMENT_STATE_CONFLICT": (409, False, "Оплата была отменена"),
+    "NOT_FOUND": (404, False, "Не удалось открыть оплату"),
+    "ACCESS_DENIED": (403, False, "Нет доступа"),
+}  # код -> (HTTP-аналог, retryable, текст для клиента); совпадает с docs/adr-006 и api/05_api_schemas.yaml
 
 
 class PaymentError(Exception):
@@ -162,8 +173,12 @@ def check_exp(qr, now):
 # ---------- деньги ----------
 
 def to_money(value):
+    """Сумма не больше чем с двумя знаками после запятой: лишние знаки — ошибка, а не тихое округление."""
     try:
-        return Decimal(str(value)).quantize(CENT, rounding=ROUND_HALF_UP)
+        amount = Decimal(str(value))
+        if not amount.is_finite() or amount != amount.quantize(CENT):
+            raise InvalidOperation
+        return amount.quantize(CENT)
     except InvalidOperation:
         raise PaymentError("VALIDATION_ERROR")
 
@@ -312,7 +327,7 @@ def create_payment(req, secret, qr_file, store, now):
     existing = [p for p in store.payments() if p["qr_id"] == qr_id]
     for p in existing:
         if p["idempotency_key"] == key:
-            same = p["amount"] == fmt(base) and (
+            same = p["amount"] == fmt(base) and req["receipt_id"] == qr["receipt_id"] and (
                 tip_in == Decimal(p["tip"]) if tip_in is not None
                 else Decimal(p["tip"]) == calc_amounts(base, tip_pct)[0])
             if not same:
@@ -380,8 +395,10 @@ def confirm_payment(payment, qr_file, store, now):
         raise PaymentError("PAYMENT_STATE_CONFLICT")
     if status != "CREATED":  # повтор: текущий статус и прежний код, шлюз не вызывается
         return payment
-    store.transition(payment, "PENDING", None, "payment_submitted", "client", now)
     qr = find_qr(qr_file, store, payment["qr_id"])
+    if qr is None:  # QR выпущен в другом файле: укажите тот же --qr-file, что при создании
+        raise PaymentError("NOT_FOUND")
+    store.transition(payment, "PENDING", None, "payment_submitted", "client", now)
     result, error = emulate_gateway(payment["qr_id"], qr["nonce"], load_scenarios())
     if result == "SUCCESS":
         store.transition(payment, "SUCCESS", None, "payment_confirmed", "system", now)
@@ -558,10 +575,14 @@ def money_json(value):
 def payment_json(p):
     return {
         "payment_id": p["payment_id"],
+        "qr_id": p["qr_id"],
         "status": p["status"],
+        "base_amount": money_json(p["amount"]),
         "tip_amount": money_json(p["tip"]),
         "amount_total": money_json(p["amount_total"]),
+        "currency": "RUB",
         "error_code": p["error_code"] or None,
+        "created_at": p["timestamp"],
     }
 
 
@@ -623,7 +644,8 @@ def main():
         else:
             payment = cancel_payment(find_payment(store, rest[0]), store, now)
     except PaymentError as e:
-        emit({"status": "ERROR", "error_code": e.code, "http": ERRORS[e.code]})
+        http, retryable, message = ERRORS[e.code]
+        emit({"status": "ERROR", "error_code": e.code, "message": message, "retryable": retryable, "http": http})
         sys.exit(2)
 
     emit(payment_json(payment))

@@ -1,0 +1,3 @@
+pyyaml
+jsonschema
+openapi-spec-validator

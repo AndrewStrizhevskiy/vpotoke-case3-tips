@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Прогон тестов T3-1…T3-9 одной командой (колонка «Факт» для docs/03-tests.md).
+Прогон тестов T3-1…T3-14 одной командой (колонка «Факт» для docs/03-tests.md).
 
     export TIPS_HMAC_SECRET=<демо-ключ из README>
     python3 prototype/run_tests.py
@@ -16,6 +16,7 @@ import sys
 import tempfile
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE_DIR)  # contract_check лежит рядом (в режиме -I каталог скрипта не в sys.path)
 PROTO = os.path.join(BASE_DIR, "04_прототип.py")
 TEST_QR = os.path.join(BASE_DIR, "test_qr_links.csv")
 NOW = "2025-11-01T18:00:00Z"
@@ -280,34 +281,60 @@ def t13():
     _, late = e4.run("reconcile", now="2025-11-01T18:20:00Z")
     closed = e4.rows()[0]
 
+    c6, other_receipt = e.run(e.req(**dict(body, receipt_id="r_1002", idempotency_key="k-13a")))  # тот же ключ, другой чек
+    c7, cents = e.run(e.req(**dict(body, base_amount=637.005, idempotency_key="k-13f")))  # три знака после запятой
+    e5 = Env()
+    e5.run("create", e5.req(**body, idempotency_key="k-13g"))
+    empty_qr = os.path.join(e5.dir, "empty_qr.csv")  # реестр QR без нужной записи
+    with open(empty_qr, "w", encoding="utf-8") as f:
+        f.write("qr_id,merchant_id,employee_id,receipt_id,nonce,exp,signature\n")
+    c8, no_qr = e5.run("confirm", "p_0101", qr_file=empty_qr)
+
     ok = (c1 == 2 and conflict["error_code"] == "IDEMPOTENCY_CONFLICT"
+          and c6 == 2 and other_receipt["error_code"] == "IDEMPOTENCY_CONFLICT"
+          and c7 == 2 and cents["error_code"] == "VALIDATION_ERROR"
+          and c8 == 2 and no_qr["error_code"] == "NOT_FOUND"
           and c2 == 2 and cancel_paid["error_code"] == "CANCEL_NOT_ALLOWED"
           and c3 == 2 and missing["error_code"] == "NOT_FOUND"
           and c4 == 2 and cancel_declined["error_code"] == "CANCEL_NOT_ALLOWED"
           and c5 == 2 and busy["error_code"] == "PAYMENT_IN_PROGRESS"
           and early["closed"] == [] and late["closed"] == ["p_0101"]
           and closed["status"] == "DECLINED" and closed["error_code"] == "GATEWAY_TIMEOUT")
-    return ok, (f"{conflict['error_code']}; отмена SUCCESS/DECLINED: {cancel_paid['error_code']}; "
+    return ok, (f"{conflict['error_code']}, тот же ключ с другим чеком: {other_receipt['error_code']}, "
+                f"сумма с 3 знаками: {cents['error_code']}, confirm без QR: {no_qr['error_code']}; отмена SUCCESS/DECLINED: {cancel_paid['error_code']}; "
                 f"второй платёж по QR: {busy['error_code']}; неизвестный платёж: {missing['error_code']}; "
                 f"сверка через 5 мин: {early['closed']}, через 20 мин: {late['closed']} -> {closed['status']}")
+
+
+def t14():
+    """Реализация сходится со спецификацией: ответы прототипа проходят схемы api/05_api_schemas.yaml."""
+    try:
+        import contract_check
+    except ImportError as exc:
+        return None, f"пропущен: нужен pip install pyyaml jsonschema ({exc.name})"
+    result = contract_check.run_checks()
+    if result.failures:
+        return False, "; ".join(result.failures[:3])
+    return True, f"{result.checked} проверок схем OpenAPI, расхождений нет"
 
 
 TESTS = [("T3-1 Успех", t1), ("T3-2 Отказ", t2), ("T3-3 Неверный QR", t3), ("T3-3б QR истёк", t3b), ("T3-3в Чужой чек", t3c),
          ("T3-4 Повтор", t4), ("T3-4б Повтор после оплаты", t4b), ("T3-5 Отмена", t5), ("T3-5б Повторные действия", t5b), ("T3-6 Таймаут", t6), ("T3-7 Блокировка", t7),
          ("T3-8 Чаевые > 50 %", t8), ("T3-9 Повторная оплата", t9),
          ("T3-10 Выпуск QR", t10), ("T3-11 Проверки выпуска QR", t11), ("T3-12 Отчёты", t12),
-         ("T3-13 Повторы и конфликты", t13)]
+         ("T3-13 Повторы и конфликты", t13), ("T3-14 Контракт API", t14)]
 
 
 def main():
     if not os.environ.get("TIPS_HMAC_SECRET"):
         sys.exit("Задайте TIPS_HMAC_SECRET (демо-ключ организаторов, см. README)")
-    failed = 0
+    failed = skipped = 0
     for name, fn in TESTS:
         ok, fact = fn()
-        failed += not ok
-        print(f"{'PASS' if ok else 'FAIL'}  {name}: {fact}")
-    print(f"\nИтого: {len(TESTS) - failed} из {len(TESTS)} пройдено")
+        skipped += ok is None
+        failed += ok is False
+        print(f"{'SKIP' if ok is None else 'PASS' if ok else 'FAIL'}  {name}: {fact}")
+    print(f"\nИтого: {len(TESTS) - failed - skipped} из {len(TESTS)} пройдено" + (f", пропущено: {skipped}" if skipped else ""))
     sys.exit(1 if failed else 0)
 
 
