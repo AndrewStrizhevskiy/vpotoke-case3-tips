@@ -21,7 +21,7 @@
 | T3-10 Выпуск QR | `qr` для m_001 / e_001 / чек r_2001 на 1250.50; повтор; платёж по ссылке; платёж с другой суммой | QR выпущен, повтор возвращает тот же; CREATED, итог 1375.55; AMOUNT_MISMATCH | qr_101 новый, повтор: qr_101 (new=False); платёж CREATED, итог 1375.55; другая сумма: AMOUNT_MISMATCH | да |
 | T3-11 Проверки выпуска QR | заблокированный мерчант m_019; официант другого мерчанта; чек r_1001 с другой суммой; неверный формат | MERCHANT_BLOCKED, ACCESS_DENIED, AMOUNT_MISMATCH, VALIDATION_ERROR; QR не выпущен | MERCHANT_BLOCKED, ACCESS_DENIED, AMOUNT_MISMATCH, VALIDATION_ERROR; QR не выпущен | да |
 | T3-12 Отчёты | `report` по m_001, e_001, по дням, пустой период, период из двух месяцев | 414.85 / 6 / 9.0 / 0.83; 83.6 / 2 / 41.8 / 2025-11-03; 2 дня; нули; VALIDATION_ERROR | m_001: 414.85 / 6 / 9.0 / 0.83; e_001: 83.6 / 2 / 41.8 / 2025-11-03; по дням: 2; пустой период: 0 | да |
-| T3-13 Повторы и конфликты | тот же ключ с другим телом и с другим `receipt_id`; сумма с тремя знаками; `confirm` без записи QR; отмена SUCCESS и DECLINED; второй платёж по QR в CREATED; сверка через 5 и 20 минут; неизвестный платёж | IDEMPOTENCY_CONFLICT дважды; VALIDATION_ERROR; NOT_FOUND; CANCEL_NOT_ALLOWED; PAYMENT_IN_PROGRESS; пусто, затем DECLINED / GATEWAY_TIMEOUT; NOT_FOUND | IDEMPOTENCY_CONFLICT дважды; VALIDATION_ERROR; NOT_FOUND; CANCEL_NOT_ALLOWED; PAYMENT_IN_PROGRESS; сверка через 5 мин: [], через 20 мин: [p_0101] → DECLINED; NOT_FOUND | да |
+| T3-13 Повторы и конфликты | тот же ключ с другим телом и с другим `receipt_id`; сумма с тремя знаками; `confirm` без записи QR; отмена SUCCESS и DECLINED; второй платёж по QR в CREATED; сверка через 5 и 15 минут; неизвестный платёж | IDEMPOTENCY_CONFLICT дважды; VALIDATION_ERROR; NOT_FOUND; CANCEL_NOT_ALLOWED; PAYMENT_IN_PROGRESS; пусто, затем DECLINED / GATEWAY_TIMEOUT; NOT_FOUND | IDEMPOTENCY_CONFLICT дважды; VALIDATION_ERROR; NOT_FOUND; CANCEL_NOT_ALLOWED; PAYMENT_IN_PROGRESS; сверка через 5 мин: [], через 15 мин: [p_0101] → DECLINED; NOT_FOUND | да |
 | T3-14 Контракт API | `prototype/contract_check.py`: запросы и ответы прототипа (QR, платёж, ошибка, три отчёта) против схем `api/05_api_schemas.yaml`; HTTP-код каждой ошибки; каталог ошибок против enum | расхождений нет | 44 проверки, расхождений нет | да |
 
 ## Ограничения прототипа
@@ -29,3 +29,5 @@
 - Статус платежа и событие аудита пишутся двумя отдельными записями (`payments_out.csv`, затем
   `audit_out.csv`). При обрыве между ними статус сменится без события. В реальной системе обе записи
   идут в одной транзакции БД (ADR-004, шаг 8).
+- Автоотмена CREATED (истёк QR или 15 минут без confirm, ADR-002) не реализована: `reconcile` закрывает
+  только зависшие PENDING. Платёж в CREATED остаётся, пока его не подтвердят или не отменят вручную.

@@ -19,7 +19,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROTO = os.path.join(BASE_DIR, "04_прототип.py")
 SEED_QR = os.path.join(BASE_DIR, "01_данные", "qr_links.csv")
 NOW = "2025-11-01T18:00:00Z"
-LATER = "2025-11-01T18:20:00Z"  # через 20 минут: сверка закроет зависший платёж
+LATER = "2025-11-01T18:15:00Z"  # через 15 минут: сверка закроет зависший платёж
 COLOR = sys.stdout.isatty() or "--color" in sys.argv
 
 CODES = {"bold": "1", "dim": "90", "red": "31", "green": "32", "yellow": "33", "blue": "34", "cyan": "36"}
@@ -132,7 +132,7 @@ def main():
     show("pay req.json", code, out)
     print(f"  строк в payments_out.csv: {len(rows(tmp))} (без изменений)")
 
-    step(6, "Таймаут шлюза и сверка", "qr_010: шлюз не ответил; отмена запрещена; через 20 минут сверка закрывает платёж")
+    step(6, "Таймаут шлюза и сверка", "qr_010: шлюз не ответил; отмена запрещена; через 15 минут сверка закрывает платёж")
     code, out = run(tmp, "pay", write_req(tmp, qr_id="qr_010", sig=seed_sig("qr_010"), receipt_id="r_1010",
                                           base_amount=1870.00, tip_pct=10, idempotency_key="demo-4"))
     show("pay req.json", code, out)
@@ -140,7 +140,7 @@ def main():
     code, out = run(tmp, "cancel", stuck)
     show(f"cancel {stuck}", code, out)
     code, out = run(tmp, "reconcile", now=LATER)
-    show("reconcile   # через 20 минут", code, out)
+    show("reconcile   # через 15 минут", code, out)
 
     step(7, "Отмена до подтверждения (T3-5)", "платёж по QR из шага 1: создан и отменён, шлюз не вызывался")
     qr_sig = qr["pay_url"].split("sig=")[1]
