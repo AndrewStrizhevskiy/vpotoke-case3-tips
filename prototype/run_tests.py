@@ -278,7 +278,7 @@ def t13():
     e4.run(e4.req(qr_id="qr_010", sig=sig_of("qr_010"), base_amount=e2_amount("qr_010"), tip_pct=10,
                   idempotency_key="k-13e"))  # PENDING, ждёт сверку
     _, early = e4.run("reconcile", now="2025-11-01T18:05:00Z")
-    _, late = e4.run("reconcile", now="2025-11-01T18:20:00Z")
+    _, late = e4.run("reconcile", now="2025-11-01T18:15:00Z")
     closed = e4.rows()[0]
 
     c6, other_receipt = e.run(e.req(**dict(body, receipt_id="r_1002", idempotency_key="k-13a")))  # тот же ключ, другой чек
@@ -303,7 +303,7 @@ def t13():
     return ok, (f"{conflict['error_code']}, тот же ключ с другим чеком: {other_receipt['error_code']}, "
                 f"сумма с 3 знаками: {cents['error_code']}, confirm без QR: {no_qr['error_code']}; отмена SUCCESS/DECLINED: {cancel_paid['error_code']}; "
                 f"второй платёж по QR: {busy['error_code']}; неизвестный платёж: {missing['error_code']}; "
-                f"сверка через 5 мин: {early['closed']}, через 20 мин: {late['closed']} -> {closed['status']}")
+                f"сверка через 5 мин: {early['closed']}, через 15 мин: {late['closed']} -> {closed['status']}")
 
 
 def t14():
