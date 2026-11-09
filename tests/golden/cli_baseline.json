@@ -1,0 +1,376 @@
+{
+ "runs": [
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r1.json",
+   "code": 0,
+   "out": "{\n  \"payment_id\": \"p_0101\",\n  \"qr_id\": \"qr_001\",\n  \"status\": \"SUCCESS\",\n  \"base_amount\": 637.0,\n  \"tip_amount\": 31.85,\n  \"amount_total\": 668.85,\n  \"currency\": \"RUB\",\n  \"error_code\": null,\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r2.json",
+   "code": 0,
+   "out": "{\n  \"payment_id\": \"p_0101\",\n  \"qr_id\": \"qr_001\",\n  \"status\": \"SUCCESS\",\n  \"base_amount\": 637.0,\n  \"tip_amount\": 31.85,\n  \"amount_total\": 668.85,\n  \"currency\": \"RUB\",\n  \"error_code\": null,\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> r3.json",
+   "code": 0,
+   "out": "{\n  \"payment_id\": \"p_0101\",\n  \"qr_id\": \"qr_001\",\n  \"status\": \"SUCCESS\",\n  \"base_amount\": 637.0,\n  \"tip_amount\": 31.85,\n  \"amount_total\": 668.85,\n  \"currency\": \"RUB\",\n  \"error_code\": null,\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r4.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"QR_USED\",\n  \"message\": \"Этот чек уже оплачен\",\n  \"retryable\": false,\n  \"http\": 409\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r5.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"IDEMPOTENCY_CONFLICT\",\n  \"message\": \"Обновите страницу\",\n  \"retryable\": false,\n  \"http\": 409\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r6.json",
+   "code": 1,
+   "out": "{\n  \"payment_id\": \"p_0102\",\n  \"qr_id\": \"qr_003\",\n  \"status\": \"DECLINED\",\n  \"base_amount\": 911.0,\n  \"tip_amount\": 136.65,\n  \"amount_total\": 1047.65,\n  \"currency\": \"RUB\",\n  \"error_code\": \"CARD_DECLINED\",\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r7.json",
+   "code": 1,
+   "out": "{\n  \"payment_id\": \"p_0103\",\n  \"qr_id\": \"qr_003\",\n  \"status\": \"DECLINED\",\n  \"base_amount\": 911.0,\n  \"tip_amount\": 136.65,\n  \"amount_total\": 1047.65,\n  \"currency\": \"RUB\",\n  \"error_code\": \"CARD_DECLINED\",\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r8.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"INVALID_QR\",\n  \"message\": \"Не удалось открыть оплату\",\n  \"retryable\": false,\n  \"http\": 422\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-02T00:00:00Z --out-dir <D> pay r9.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"QR_EXPIRED\",\n  \"message\": \"QR устарел, попросите официанта новый\",\n  \"retryable\": true,\n  \"http\": 410\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r10.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"RECEIPT_MISMATCH\",\n  \"message\": \"Не удалось открыть оплату\",\n  \"retryable\": false,\n  \"http\": 422\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r11.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"TIP_OUT_OF_RANGE\",\n  \"message\": \"Чаевые — не больше 50 % от чека\",\n  \"retryable\": true,\n  \"http\": 422\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r12.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"TIP_OUT_OF_RANGE\",\n  \"message\": \"Чаевые — не больше 50 % от чека\",\n  \"retryable\": true,\n  \"http\": 422\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r13.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"VALIDATION_ERROR\",\n  \"message\": \"Неверный формат запроса\",\n  \"retryable\": false,\n  \"http\": 400\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r14.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"AMOUNT_MISMATCH\",\n  \"message\": \"Сумма чека изменилась, обновите страницу\",\n  \"retryable\": false,\n  \"http\": 422\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r15.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"VALIDATION_ERROR\",\n  \"message\": \"Неверный формат запроса\",\n  \"retryable\": false,\n  \"http\": 400\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r16.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"VALIDATION_ERROR\",\n  \"message\": \"Неверный формат запроса\",\n  \"retryable\": false,\n  \"http\": 400\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r17.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"INVALID_QR\",\n  \"message\": \"Не удалось открыть оплату\",\n  \"retryable\": false,\n  \"http\": 422\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r18.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"VALIDATION_ERROR\",\n  \"message\": \"Неверный формат запроса\",\n  \"retryable\": false,\n  \"http\": 400\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay missing.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"VALIDATION_ERROR\",\n  \"message\": \"Неверный формат запроса\",\n  \"retryable\": false,\n  \"http\": 400\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r19.json",
+   "code": 0,
+   "out": "{\n  \"payment_id\": \"p_0104\",\n  \"qr_id\": \"qr_002\",\n  \"status\": \"SUCCESS\",\n  \"base_amount\": 774.0,\n  \"tip_amount\": 38.7,\n  \"amount_total\": 812.7,\n  \"currency\": \"RUB\",\n  \"error_code\": null,\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r20.json",
+   "code": 1,
+   "out": "{\n  \"payment_id\": \"p_0105\",\n  \"qr_id\": \"qr_010\",\n  \"status\": \"PENDING\",\n  \"base_amount\": 1870.0,\n  \"tip_amount\": 187.0,\n  \"amount_total\": 2057.0,\n  \"currency\": \"RUB\",\n  \"error_code\": \"GATEWAY_TIMEOUT\",\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> cancel p_0103",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"CANCEL_NOT_ALLOWED\",\n  \"message\": \"Отмена невозможна: оплата уже отправлена в банк или закрыта\",\n  \"retryable\": false,\n  \"http\": 409\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> confirm p_0103",
+   "code": 1,
+   "out": "{\n  \"payment_id\": \"p_0103\",\n  \"qr_id\": \"qr_003\",\n  \"status\": \"DECLINED\",\n  \"base_amount\": 911.0,\n  \"tip_amount\": 136.65,\n  \"amount_total\": 1047.65,\n  \"currency\": \"RUB\",\n  \"error_code\": \"CARD_DECLINED\",\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:05:00Z --out-dir <D> reconcile",
+   "code": 0,
+   "out": "{\n  \"closed\": []\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:15:00Z --out-dir <D> reconcile",
+   "code": 0,
+   "out": "{\n  \"closed\": [\n    \"p_0105\"\n  ]\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> cancel p_0103",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"CANCEL_NOT_ALLOWED\",\n  \"message\": \"Отмена невозможна: оплата уже отправлена в банк или закрыта\",\n  \"retryable\": false,\n  \"http\": 409\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> confirm p_0103",
+   "code": 1,
+   "out": "{\n  \"payment_id\": \"p_0103\",\n  \"qr_id\": \"qr_003\",\n  \"status\": \"DECLINED\",\n  \"base_amount\": 911.0,\n  \"tip_amount\": 136.65,\n  \"amount_total\": 1047.65,\n  \"currency\": \"RUB\",\n  \"error_code\": \"CARD_DECLINED\",\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> create r21.json",
+   "code": 0,
+   "out": "{\n  \"payment_id\": \"p_0106\",\n  \"qr_id\": \"qr_005\",\n  \"status\": \"CREATED\",\n  \"base_amount\": 1185.0,\n  \"tip_amount\": 118.5,\n  \"amount_total\": 1303.5,\n  \"currency\": \"RUB\",\n  \"error_code\": null,\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> create r22.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"PAYMENT_IN_PROGRESS\",\n  \"message\": \"Оплата уже обрабатывается\",\n  \"retryable\": true,\n  \"http\": 409\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> cancel p_0104",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"CANCEL_NOT_ALLOWED\",\n  \"message\": \"Отмена невозможна: оплата уже отправлена в банк или закрыта\",\n  \"retryable\": false,\n  \"http\": 409\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> cancel p_0104",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"CANCEL_NOT_ALLOWED\",\n  \"message\": \"Отмена невозможна: оплата уже отправлена в банк или закрыта\",\n  \"retryable\": false,\n  \"http\": 409\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> confirm p_0104",
+   "code": 0,
+   "out": "{\n  \"payment_id\": \"p_0104\",\n  \"qr_id\": \"qr_002\",\n  \"status\": \"SUCCESS\",\n  \"base_amount\": 774.0,\n  \"tip_amount\": 38.7,\n  \"amount_total\": 812.7,\n  \"currency\": \"RUB\",\n  \"error_code\": null,\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> create r23.json",
+   "code": 0,
+   "out": "{\n  \"payment_id\": \"p_0107\",\n  \"qr_id\": \"qr_006\",\n  \"status\": \"CREATED\",\n  \"base_amount\": 1322.0,\n  \"tip_amount\": 0.0,\n  \"amount_total\": 1322.0,\n  \"currency\": \"RUB\",\n  \"error_code\": null,\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> confirm p_0105",
+   "code": 1,
+   "out": "{\n  \"payment_id\": \"p_0105\",\n  \"qr_id\": \"qr_010\",\n  \"status\": \"DECLINED\",\n  \"base_amount\": 1870.0,\n  \"tip_amount\": 187.0,\n  \"amount_total\": 2057.0,\n  \"currency\": \"RUB\",\n  \"error_code\": \"GATEWAY_TIMEOUT\",\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> confirm p_0105",
+   "code": 1,
+   "out": "{\n  \"payment_id\": \"p_0105\",\n  \"qr_id\": \"qr_010\",\n  \"status\": \"DECLINED\",\n  \"base_amount\": 1870.0,\n  \"tip_amount\": 187.0,\n  \"amount_total\": 2057.0,\n  \"currency\": \"RUB\",\n  \"error_code\": \"GATEWAY_TIMEOUT\",\n  \"created_at\": \"2025-11-01T18:00:00Z\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> cancel p_0105",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"CANCEL_NOT_ALLOWED\",\n  \"message\": \"Отмена невозможна: оплата уже отправлена в банк или закрыта\",\n  \"retryable\": false,\n  \"http\": 409\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> confirm p_9999",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"NOT_FOUND\",\n  \"message\": \"Не удалось открыть оплату\",\n  \"retryable\": false,\n  \"http\": 404\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> cancel p_9999",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"NOT_FOUND\",\n  \"message\": \"Не удалось открыть оплату\",\n  \"retryable\": false,\n  \"http\": 404\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> --qr-file <REPO>/prototype/test_qr_links.csv pay r24.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"MERCHANT_BLOCKED\",\n  \"message\": \"Оплата в заведении недоступна\",\n  \"retryable\": false,\n  \"http\": 403\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> qr r25.json",
+   "code": 0,
+   "out": "{\n  \"qr_id\": \"qr_101\",\n  \"pay_url\": \"<URL>\",\n  \"exp\": \"2025-11-02T18:00:00Z\",\n  \"new\": true,\n  \"png\": null\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> qr r26.json",
+   "code": 0,
+   "out": "{\n  \"qr_id\": \"qr_101\",\n  \"pay_url\": \"<URL>\",\n  \"exp\": \"2025-11-02T18:00:00Z\",\n  \"new\": false,\n  \"png\": null\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> qr r27.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"AMOUNT_MISMATCH\",\n  \"message\": \"Сумма чека изменилась, обновите страницу\",\n  \"retryable\": false,\n  \"http\": 422\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> qr r28.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"ACCESS_DENIED\",\n  \"message\": \"Нет доступа\",\n  \"retryable\": false,\n  \"http\": 403\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> qr r29.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"MERCHANT_BLOCKED\",\n  \"message\": \"Оплата в заведении недоступна\",\n  \"retryable\": false,\n  \"http\": 403\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> qr r30.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"ACCESS_DENIED\",\n  \"message\": \"Нет доступа\",\n  \"retryable\": false,\n  \"http\": 403\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> qr r31.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"VALIDATION_ERROR\",\n  \"message\": \"Неверный формат запроса\",\n  \"retryable\": false,\n  \"http\": 400\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> qr r32.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"NOT_FOUND\",\n  \"message\": \"Не удалось открыть оплату\",\n  \"retryable\": false,\n  \"http\": 404\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --merchant m_001 --from 2025-11-01 --to 2025-11-30",
+   "code": 0,
+   "out": "{\n  \"merchant_id\": \"m_001\",\n  \"period\": \"2025-11\",\n  \"tips_total\": 485.4,\n  \"payments_count\": 10,\n  \"avg_tip_pct\": 7.86,\n  \"success_rate\": 0.7\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --employee e_001 --from 2025-11-01 --to 2025-11-30",
+   "code": 0,
+   "out": "{\n  \"employee_id\": \"e_001\",\n  \"period\": \"2025-11\",\n  \"tips_total\": 115.45,\n  \"payments_count\": 3,\n  \"avg_tip_amount\": 38.48,\n  \"top_day\": \"2025-11-01\"\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --merchant m_001 --from 2025-11-01 --to 2025-11-30 --daily",
+   "code": 0,
+   "out": "{\n  \"merchant_id\": \"m_001\",\n  \"daily\": [\n    {\n      \"date\": \"2025-11-01\",\n      \"tips_total\": 316.45,\n      \"payments_count\": 7,\n      \"avg_tip_pct\": 8.0\n    },\n    {\n      \"date\": \"2025-11-03\",\n      \"tips_total\": 168.95,\n      \"payments_count\": 3,\n      \"avg_tip_pct\": 7.5\n    }\n  ]\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --merchant m_001 --from 2026-01-01 --to 2026-01-31",
+   "code": 0,
+   "out": "{\n  \"merchant_id\": \"m_001\",\n  \"period\": \"2026-01\",\n  \"tips_total\": 0.0,\n  \"payments_count\": 0,\n  \"avg_tip_pct\": null,\n  \"success_rate\": 0.0\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --merchant m_001 --employee e_001 --from 2025-11-01 --to 2025-11-30",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"VALIDATION_ERROR\",\n  \"message\": \"Неверный формат запроса\",\n  \"retryable\": false,\n  \"http\": 400\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --merchant m_001 --from 2025-11-30 --to 2025-11-01",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"VALIDATION_ERROR\",\n  \"message\": \"Неверный формат запроса\",\n  \"retryable\": false,\n  \"http\": 400\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --merchant m_001 --from 2025-10-15 --to 2025-11-30",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"VALIDATION_ERROR\",\n  \"message\": \"Неверный формат запроса\",\n  \"retryable\": false,\n  \"http\": 400\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --merchant m_777 --from 2025-11-01 --to 2025-11-30",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"NOT_FOUND\",\n  \"message\": \"Не удалось открыть оплату\",\n  \"retryable\": false,\n  \"http\": 404\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --employee e_777 --from 2025-11-01 --to 2025-11-30",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"NOT_FOUND\",\n  \"message\": \"Не удалось открыть оплату\",\n  \"retryable\": false,\n  \"http\": 404\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --merchant m_005 --from 2025-11-01 --to 2025-11-30 --daily",
+   "code": 0,
+   "out": "{\n  \"merchant_id\": \"m_005\",\n  \"daily\": [\n    {\n      \"date\": \"2025-11-01\",\n      \"tips_total\": 739.1,\n      \"payments_count\": 3,\n      \"avg_tip_pct\": 10.0\n    },\n    {\n      \"date\": \"2025-11-03\",\n      \"tips_total\": 0.0,\n      \"payments_count\": 3,\n      \"avg_tip_pct\": null\n    }\n  ]\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01 --out-dir <D> pay r33.json",
+   "code": 2,
+   "out": "{\n  \"status\": \"ERROR\",\n  \"error_code\": \"VALIDATION_ERROR\",\n  \"message\": \"Неверный формат запроса\",\n  \"retryable\": false,\n  \"http\": 400\n}\n",
+   "err": ""
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> pay r34.json",
+   "code": 1,
+   "out": "",
+   "err": "Ошибка: не задана переменная окружения TIPS_HMAC_SECRET"
+  },
+  {
+   "cmd": "--out-dir <D>",
+   "code": 2,
+   "out": "",
+   "err": "usage: 04_прототип.py [-h] [--now NOW] [--qr-file QR_FILE] [--out-dir OUT_DIR]\n                      [--merchant MERCHANT] [--employee EMPLOYEE]\n                      [--from FROM_DATE] [--to TO_DATE] [--daily]\n                      [args ...]\n04_прототип.py: error: нужна команда"
+  },
+  {
+   "cmd": "--now 2025-11-01T18:00:00Z --out-dir <D> report --merchant m_001 --from 2025-11-01 --to 2025-11-30",
+   "code": 0,
+   "out": "{\n  \"merchant_id\": \"m_001\",\n  \"period\": \"2025-11\",\n  \"tips_total\": 485.4,\n  \"payments_count\": 10,\n  \"avg_tip_pct\": 7.86,\n  \"success_rate\": 0.7\n}\n",
+   "err": ""
+  }
+ ],
+ "files": {
+  "audit_out.csv": "event_id,payment_id,qr_id,action,from_status,to_status,amount_total,actor,at\nevt_0001,p_0101,qr_001,payment_created,,CREATED,668.85,client,2025-11-01T18:00:00Z\nevt_0002,p_0101,qr_001,payment_submitted,CREATED,PENDING,668.85,client,2025-11-01T18:00:00Z\nevt_0003,p_0101,qr_001,payment_confirmed,PENDING,SUCCESS,668.85,system,2025-11-01T18:00:00Z\nevt_0004,p_0102,qr_003,payment_created,,CREATED,1047.65,client,2025-11-01T18:00:00Z\nevt_0005,p_0102,qr_003,payment_submitted,CREATED,PENDING,1047.65,client,2025-11-01T18:00:00Z\nevt_0006,p_0102,qr_003,payment_declined,PENDING,DECLINED,1047.65,system,2025-11-01T18:00:00Z\nevt_0007,p_0103,qr_003,payment_created,,CREATED,1047.65,client,2025-11-01T18:00:00Z\nevt_0008,p_0103,qr_003,payment_submitted,CREATED,PENDING,1047.65,client,2025-11-01T18:00:00Z\nevt_0009,p_0103,qr_003,payment_declined,PENDING,DECLINED,1047.65,system,2025-11-01T18:00:00Z\nevt_0010,p_0104,qr_002,payment_created,,CREATED,812.70,client,2025-11-01T18:00:00Z\nevt_0011,p_0104,qr_002,payment_submitted,CREATED,PENDING,812.70,client,2025-11-01T18:00:00Z\nevt_0012,p_0104,qr_002,payment_confirmed,PENDING,SUCCESS,812.70,system,2025-11-01T18:00:00Z\nevt_0013,p_0105,qr_010,payment_created,,CREATED,2057.00,client,2025-11-01T18:00:00Z\nevt_0014,p_0105,qr_010,payment_submitted,CREATED,PENDING,2057.00,client,2025-11-01T18:00:00Z\nevt_0015,p_0105,qr_010,payment_declined,PENDING,DECLINED,2057.00,system,2025-11-01T18:15:00Z\nevt_0016,p_0106,qr_005,payment_created,,CREATED,1303.50,client,2025-11-01T18:00:00Z\nevt_0017,p_0107,qr_006,payment_created,,CREATED,1322.00,client,2025-11-01T18:00:00Z\n",
+  "payments_out.csv": "payment_id,merchant_id,employee_id,amount,tip,status,timestamp,qr_id,idempotency_key,amount_total,error_code\np_0101,m_001,e_001,637.00,31.85,SUCCESS,2025-11-01T18:00:00Z,qr_001,k1,668.85,\np_0102,m_001,e_003,911.00,136.65,DECLINED,2025-11-01T18:00:00Z,qr_003,k3,1047.65,CARD_DECLINED\np_0103,m_001,e_003,911.00,136.65,DECLINED,2025-11-01T18:00:00Z,qr_003,k3b,1047.65,CARD_DECLINED\np_0104,m_001,e_002,774.00,38.70,SUCCESS,2025-11-01T18:00:00Z,qr_002,<UUID>,812.70,\np_0105,m_004,e_010,1870.00,187.00,DECLINED,2025-11-01T18:00:00Z,qr_010,k20,2057.00,GATEWAY_TIMEOUT\np_0106,m_002,e_005,1185.00,118.50,CREATED,2025-11-01T18:00:00Z,qr_005,k30,1303.50,\np_0107,m_002,e_006,1322.00,0.00,CREATED,2025-11-01T18:00:00Z,qr_006,k32,1322.00,\n",
+  "qr_out.csv": "qr_id,merchant_id,employee_id,receipt_id,nonce,exp,signature\nqr_101,m_001,e_001,r_2001,<NONCE>,2025-11-02T18:00:00Z,<SIG>\n",
+  "receipts_out.csv": "merchant_id,receipt_id,amount,currency\nm_001,r_2001,1250.50,RUB\n"
+ }
+}

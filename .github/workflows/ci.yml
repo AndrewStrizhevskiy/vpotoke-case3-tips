@@ -2,7 +2,7 @@ name: tests
 
 on:
   push:
-    branches: [main, team_11_case_3]
+    branches: [main, team_11_case_3, product/foundation]
   pull_request:
 
 jobs:
@@ -14,7 +14,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install checkers
-        run: pip install pyyaml jsonschema openapi-spec-validator
+        run: pip install pyyaml jsonschema openapi-spec-validator ruff
+      - name: Lint
+        run: ruff check src tests prototype/04_прототип.py
+      - name: Unit tests (domain)
+        run: python3 -m unittest discover -s tests -p "test_*.py"
       - name: Validate OpenAPI
         run: openapi-spec-validator api/05_api_schemas.yaml
       - name: Source data unchanged
@@ -27,3 +31,5 @@ jobs:
         env:
           TIPS_HMAC_SECRET: demo-secret-k3
         run: python3 prototype/demo.py
+      - name: Golden CLI outputs unchanged
+        run: python3 tests/golden_cli.py check tests/golden/cli_baseline.json

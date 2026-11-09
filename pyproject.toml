@@ -1,0 +1,24 @@
+[project]
+name = "tips"
+version = "0.1.0"
+description = "Платформа онлайн-чаевых по QR: предметная логика, адаптеры, CLI"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["ruff", "pyyaml", "jsonschema", "openapi-spec-validator"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 130
+src = ["src", "tests"]
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+# эталонный сценарий записан плотно, как таблица команд
+"tests/golden_cli.py" = ["E401", "E501", "E701", "E702", "E731"]
