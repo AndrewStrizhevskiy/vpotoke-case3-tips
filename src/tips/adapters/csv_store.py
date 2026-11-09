@@ -1,6 +1,7 @@
 """Хранилище на CSV: payments_out.csv, audit_out.csv, qr_out.csv, receipts_out.csv (ADR-005)."""
 import csv
 import os
+from contextlib import nullcontext
 from decimal import Decimal
 
 from tips.config import DATA_DIR
@@ -139,6 +140,23 @@ class CsvStore:
         for row in self.seed_payments():
             if row["payment_id"] == payment_id:
                 return Decimal(row["amount"])
+        return None
+
+    # ---- транзакционные точки: на файлах это no-op, в SQL-адаптере — настоящая транзакция ----
+
+    def atomic(self):
+        return nullcontext()
+
+    def lock_qr(self, qr_id):
+        return None
+
+    def payments_for_qr(self, qr_id):
+        return [p for p in self.payments() if p["qr_id"] == qr_id]
+
+    def get_payment(self, payment_id):
+        for p in self.payments():
+            if p["payment_id"] == payment_id:
+                return p
         return None
 
     # ---- запись ----

@@ -20,6 +20,10 @@ ERRORS = {
 }  # код -> (HTTP-аналог, retryable, текст для клиента); совпадает с docs/adr-006 и api/05_api_schemas.yaml
 
 
+class StateChanged(Exception):
+    """Платёж уже сменил статус: условное обновление не затронуло строку (параллельный запрос)."""
+
+
 class PaymentError(Exception):
     def __init__(self, code):
         super().__init__(code)

@@ -122,3 +122,53 @@ class PaymentGateway(Protocol):
 5. **Поздний успех и двойная оплата:** автовозврат или ручной разбор, кто платит за возвраты; хостинг в РФ (152-ФЗ), целевой SLA.
 
 Допущения, которые не проверялись: нагрузка небольшая, один регион, у провайдера есть токенизация и void.
+
+## 8. Состояние реализации
+
+| Этап | Статус |
+|-|-|
+| M0 Инструменты | сделано: `pyproject.toml`, ruff, юнит-тесты, эталонные выводы CLI, CI |
+| M1 Рефакторинг | сделано: пакет `src/tips`, CSV за портами, поведение прототипа не менялось |
+| M2 PostgreSQL | сделано: `src/tips/adapters/sql`, миграция `migrations/versions/0001_initial.py`, seed, режим `TIPS_STORE=sql` |
+
+### M2: что реализовано и чем отличается от проекта выше
+
+- Те же 18 приёмочных тестов (`prototype/run_tests.py`) и 61 команда эталонного сценария (`tests/golden_cli.py`) дают одинаковый результат на CSV и на PostgreSQL. Исключение одно: проверка «confirm без QR» относится к CSV-режиму (QR в другом файле) и в SQL не выполняется.
+- Параллельность (`tests/test_postgres.py`, 13 тестов): 20 одновременных создания платежей на один QR с разными ключами дают ровно один платёж и 19 `PAYMENT_IN_PROGRESS`; 20 запросов с одним ключом дают один платёж; 10 параллельных confirm вызывают шлюз один раз; гонка cancel и confirm приходит к одному согласованному состоянию; параллельная сверка закрывает платёж один раз; `UPDATE`, `DELETE` и `TRUNCATE` в `audit_events` запрещены.
+- Защита двойной оплаты двухслойная: блокировка строки QR (`FOR UPDATE`) выстраивает запросы в очередь, а уникальные индексы `payments_one_active` и `payments_one_success` не дают записать второй платёж, даже если блокировку убрать. Это проверено «мутацией»: без блокировки тесты проходят благодаря индексу, без блокировки и без индекса падают (5 платежей вместо одного).
+- Переход статуса условный (`UPDATE … WHERE status = :старый`): проигравший гонку получает `StateChanged` и отвечает как на повторный запрос; шлюз вызывается только после успешного перехода в PENDING.
+
+Отличия от раздела 3:
+
+- `idempotency_key` хранится как `text`, а не `uuid`: прототип и контракт принимают любую непустую строку. Ужесточение до UUIDv4 войдёт в API v2 (раздел 4, пункт 2).
+- Идентификаторы `p_NNNN` выдаются последовательностью `payment_seq` (с 101). При откате транзакции номер пропадает, подряд идущими они остаются только без сбоев.
+- `CHECK (tip <= amount * 0.5 + 0.005)`: полкопейки добавлены, потому что чаевые 50 % от очень малой суммы округляются вверх (0,01 от 0,01), и прототип такой платёж разрешает.
+- История платежей из seed-данных лежит в отдельной таблице `seed_payments` (только для отчётов): в CSV-режиме она тоже не влияет на блокировку QR и погашение nonce.
+- `qr_codes.created_at` считается как `exp - 24 ч`, пока в сервисе нет собственного времени выпуска.
+- Не сделано в M2: роли БД с `REVOKE UPDATE, DELETE` (аудит защищён триггером), `request_hash`, `confirm_token_hash`, `gateway_events`, пользователи (M3–M6).
+
+### Как запустить локально
+
+```bash
+python3 -m venv .venv && .venv/bin/python -m pip install -e ".[dev,local-db]"
+export TIPS_HMAC_SECRET=<демо-ключ из README>
+
+# все проверки на CSV
+.venv/bin/python prototype/run_tests.py
+.venv/bin/python tests/golden_cli.py check tests/golden/cli_baseline.json
+
+# своя база: миграции и seed, затем CLI поверх PostgreSQL
+export TIPS_DATABASE_URL=postgresql://user:password@localhost:5432/tips
+python3 -m tips.adapters.sql.admin migrate && python3 -m tips.adapters.sql.admin seed
+TIPS_STORE=sql python3 prototype/04_прототип.py --now 2025-11-01T18:00:00Z pay qr.json
+
+# те же тесты через PostgreSQL (по схеме на тест)
+TIPS_STORE=sql .venv/bin/python prototype/run_tests.py
+TIPS_STORE=sql .venv/bin/python tests/golden_cli.py check tests/golden/cli_baseline.json
+
+# гонки и ограничения базы (без своей базы поднимется встроенный PostgreSQL из pgserver)
+.venv/bin/python -m unittest discover -s tests -p "test_*.py"
+```
+
+Если `.venv/bin/python -m tips.adapters.sql.admin` не находит пакет, добавьте `PYTHONPATH=src`.
+

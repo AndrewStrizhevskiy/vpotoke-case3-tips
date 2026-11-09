@@ -4,16 +4,21 @@
     python3 tests/golden_cli.py check tests/golden/cli_baseline.json    # сравнить с эталоном
     python3 tests/golden_cli.py record tests/golden/cli_baseline.json   # перезаписать эталон намеренно
 
+С TIPS_STORE=sql и TIPS_DATABASE_URL те же команды идут через PostgreSQL (новая схема на прогон), сравниваются
+вывод и коды выхода; CSV-файлы в этом режиме не сравниваются. Запускать нужно интерпретатором с sqlalchemy и psycopg.
+
 Сценарий из 61 команды гоняется во временном каталоге с фиксированным временем. Случайные nonce, подписи
 и UUID маскируются. Любое изменение поведения CLI (в том числе при смене хранилища) видно как расхождение.
 Нужна переменная TIPS_HMAC_SECRET? Нет: скрипт сам задаёт демо-ключ организаторов для дочерних процессов.
 """
-import csv, json, os, re, subprocess, sys, tempfile
+import csv, json, os, re, subprocess, sys, tempfile, uuid
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 PROTO = os.path.join(REPO, "prototype", "04_прототип.py")
 SEED = os.path.join(REPO, "prototype", "01_данные")
 NOW = "2025-11-01T18:00:00Z"
+SQL = os.environ.get("TIPS_STORE") == "sql"
+SQL_ENV = {}
 rows = lambda f: list(csv.DictReader(open(os.path.join(SEED, f), encoding="utf-8", newline="")))
 QR = {r["qr_id"]: r for r in rows("qr_links.csv")}
 PAY = {r["payment_id"]: r for r in rows("payments.csv")}
@@ -29,6 +34,7 @@ def mask(text, rules):
 def run(d, args, now=NOW, secret=True, extra=()):
     env = {k: v for k, v in os.environ.items() if k != "TIPS_HMAC_SECRET"}
     if secret: env["TIPS_HMAC_SECRET"] = "demo-secret-k3"
+    env.update(SQL_ENV)
     cmd = [sys.executable, "-I", PROTO] + (["--now", now] if now else []) + ["--out-dir", d] + list(extra) + list(args)
     p = subprocess.run(cmd, capture_output=True, text=True, env=env)
     return {"cmd": " ".join(a if not a.startswith(d) else os.path.basename(a) for a in cmd[3:]).replace(os.path.basename(d), "<D>").replace(REPO, "<REPO>"),
@@ -37,6 +43,14 @@ def run(d, args, now=NOW, secret=True, extra=()):
 def main():
     out = []
     d = tempfile.mkdtemp()
+    engine = None
+    if SQL:
+        sys.path.insert(0, os.path.join(REPO, "src"))
+        from tips.adapters.sql.admin import bootstrap
+        schema = "g_" + uuid.uuid4().hex[:12]
+        url = os.environ["TIPS_DATABASE_URL"]
+        engine = bootstrap(url, schema)
+        SQL_ENV.update({"TIPS_STORE": "sql", "TIPS_DATABASE_URL": url, "TIPS_DB_SCHEMA": schema})
     n = [0]
     def req(**b):
         n[0] += 1
@@ -85,8 +99,14 @@ def main():
     R(["confirm", "p_9999"]); R(["cancel", "p_9999"])
     # блокировка мерчанта (тестовый QR из репозитория)
     tq = list(csv.DictReader(open(os.path.join(REPO, "prototype", "test_qr_links.csv"), encoding="utf-8")))[0]
+    if SQL:
+        from tips.adapters.sql.seed import add_extra_qrs
+        add_extra_qrs(engine, os.path.join(REPO, "prototype", "test_qr_links.csv"))
     R(["pay", req(qr_id=tq["qr_id"], sig=tq["signature"], receipt_id=tq["receipt_id"], base_amount=500.0, tip_pct=10, idempotency_key="k40")],
       extra=["--qr-file", os.path.join(REPO, "prototype", "test_qr_links.csv")])
+    if SQL:
+        from tips.adapters.sql.seed import remove_extra_qrs
+        remove_extra_qrs(engine, os.path.join(REPO, "prototype", "test_qr_links.csv"))
     # выпуск QR
     R(["qr", raw(json.dumps({"merchant_id": "m_001", "employee_id": "e_001", "receipt_id": "r_2001", "amount": 1250.5}))])
     R(["qr", raw(json.dumps({"merchant_id": "m_001", "employee_id": "e_001", "receipt_id": "r_2001", "amount": 1250.5}))])
@@ -114,8 +134,12 @@ def main():
     R([], now=None)
     R(["report", "--merchant", "m_001", "--from", "2025-11-01", "--to", "2025-11-30"], secret=False)
     files = {}
+    if SQL:
+        from tips.adapters.sql.admin import drop_schema
+        engine.dispose()
+        drop_schema(SQL_ENV["TIPS_DATABASE_URL"].replace("postgresql://", "postgresql+psycopg://", 1), SQL_ENV["TIPS_DB_SCHEMA"])
     for f in sorted(os.listdir(d)):
-        if f.endswith(".csv"):
+        if f.endswith(".csv") and not SQL:
             files[f] = mask(open(os.path.join(d, f), encoding="utf-8").read(), CSV_MASK)
     return {"runs": out, "files": files}
 
@@ -133,6 +157,6 @@ if __name__ == "__main__":
                 bad += 1; print("DIFF", a["cmd"]); print("  was:", a["code"], a["out"][:200], a["err"][:100]); print("  now:", b["code"], b["out"][:200], b["err"][:100])
         if len(old["runs"]) != len(result["runs"]): bad += 1; print("run count differs")
         for k in set(old["files"]) | set(result["files"]):
-            if old["files"].get(k) != result["files"].get(k): bad += 1; print("FILE DIFF", k)
+            if not SQL and old["files"].get(k) != result["files"].get(k): bad += 1; print("FILE DIFF", k)
         print("golden:", "OK" if not bad else f"{bad} differences", f"({len(result['runs'])} runs)")
         sys.exit(1 if bad else 0)

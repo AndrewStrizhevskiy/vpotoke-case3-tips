@@ -8,16 +8,33 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: tips
+          POSTGRES_DB: tips
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TIPS_DATABASE_URL: postgresql://postgres:tips@localhost:5432/tips
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install checkers
-        run: pip install pyyaml jsonschema openapi-spec-validator ruff
+        run: pip install pyyaml jsonschema openapi-spec-validator ruff "sqlalchemy>=2.0" "psycopg[binary]" alembic
       - name: Lint
-        run: ruff check src tests prototype/04_прототип.py
-      - name: Unit tests (domain)
+        run: ruff check src tests migrations prototype/04_прототип.py
+      - name: Unit tests (domain, PostgreSQL races and constraints)
+        env:
+          TIPS_HMAC_SECRET: demo-secret-k3
+          TIPS_TEST_DATABASE_URL: postgresql://postgres:tips@localhost:5432/tips
         run: python3 -m unittest discover -s tests -p "test_*.py"
       - name: Validate OpenAPI
         run: openapi-spec-validator api/05_api_schemas.yaml
@@ -32,4 +49,13 @@ jobs:
           TIPS_HMAC_SECRET: demo-secret-k3
         run: python3 prototype/demo.py
       - name: Golden CLI outputs unchanged
+        run: python3 tests/golden_cli.py check tests/golden/cli_baseline.json
+      - name: Prototype tests on PostgreSQL
+        env:
+          TIPS_HMAC_SECRET: demo-secret-k3
+          TIPS_STORE: sql
+        run: python3 prototype/run_tests.py
+      - name: Golden CLI outputs on PostgreSQL
+        env:
+          TIPS_STORE: sql
         run: python3 tests/golden_cli.py check tests/golden/cli_baseline.json

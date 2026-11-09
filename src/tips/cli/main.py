@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from tips.adapters.csv_store import CsvStore
+from tips.adapters.factory import make_store
 from tips.adapters.gateway.emulator import EmulatorGateway
 from tips.adapters.qr_png import QrencodeRenderer
 from tips.app.payments import cancel_payment, confirm_payment, create_payment, find_payment
@@ -62,7 +62,7 @@ def main():
         parser.error("нужна команда")
     cmd, rest = (ns.args[0], ns.args[1:]) if ns.args[0] in commands else ("pay", ns.args)
     secret = get_secret() if cmd in ("pay", "create", "qr") else None
-    store = CsvStore(ns.out_dir, DATA_DIR, ns.qr_file)
+    store = make_store(ns.out_dir, ns.qr_file)
     gateway = EmulatorGateway()
 
     try:

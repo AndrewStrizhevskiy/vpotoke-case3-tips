@@ -6,7 +6,9 @@ requires-python = ">=3.9"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["ruff", "pyyaml", "jsonschema", "openapi-spec-validator"]
+sql = ["sqlalchemy>=2.0", "psycopg[binary]>=3.1", "alembic>=1.13"]
+dev = ["ruff", "pyyaml", "jsonschema", "openapi-spec-validator", "tips[sql]"]
+local-db = ["pgserver"]  # встроенный PostgreSQL для локальных тестов без Docker
 
 [tool.setuptools.packages.find]
 where = ["src"]

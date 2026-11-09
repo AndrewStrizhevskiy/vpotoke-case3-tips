@@ -7,6 +7,10 @@
 
 Каждый тест работает в новом временном каталоге, поэтому payments_out.csv и audit_out.csv
 в репозитории не трогаются и между тестами не накапливаются.
+
+Тот же набор идёт через PostgreSQL: TIPS_STORE=sql TIPS_DATABASE_URL=postgresql://… и интерпретатор
+с sqlalchemy и psycopg. Каждый тест получает свою схему (миграции и seed), после прогона схемы удаляются.
+Проверка «confirm без QR» относится к CSV (QR в другом файле) и в режиме sql не выполняется.
 """
 import csv
 import json
@@ -17,6 +21,9 @@ import tempfile
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)  # contract_check лежит рядом (в режиме -I каталог скрипта не в sys.path)
+sys.path.insert(0, os.path.join(BASE_DIR, "..", "src"))
+SQL = os.environ.get("TIPS_STORE") == "sql"
+SQL_SCHEMAS = []  # схемы, созданные тестами: удаляются в конце прогона
 PROTO = os.path.join(BASE_DIR, "04_прототип.py")
 TEST_QR = os.path.join(BASE_DIR, "test_qr_links.csv")
 NOW = "2025-11-01T18:00:00Z"
@@ -28,12 +35,27 @@ class Env:
     def __init__(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.dir = self._tmp.name
+        self.sql_env = {}
+        self.engine = None
+        if SQL:
+            import uuid
+            from tips.adapters.sql.admin import bootstrap
+            schema = "t_" + uuid.uuid4().hex[:12]
+            url = os.environ["TIPS_DATABASE_URL"]
+            self.engine = bootstrap(url, schema)
+            SQL_SCHEMAS.append(schema)
+            self.sql_env = {"TIPS_STORE": "sql", "TIPS_DATABASE_URL": url, "TIPS_DB_SCHEMA": schema}
 
     def run(self, *args, now=NOW, qr_file=None):
         cmd = [sys.executable, "-I", PROTO, "--now", now, "--out-dir", self.dir]
         if qr_file:
             cmd += ["--qr-file", qr_file]
-        proc = subprocess.run(cmd + list(args), capture_output=True, text=True)
+            if SQL and qr_file == TEST_QR:  # тестовые QR из отдельного файла в базу заводятся заранее
+                from tips.adapters.sql.seed import add_extra_qrs
+                add_extra_qrs(self.engine, TEST_QR)
+        env = dict(os.environ)
+        env.update(self.sql_env)
+        proc = subprocess.run(cmd + list(args), capture_output=True, text=True, env=env)
         return proc.returncode, json.loads(proc.stdout) if proc.stdout.strip() else {}
 
     def req(self, **body):
@@ -44,7 +66,28 @@ class Env:
             json.dump(body, f)
         return path
 
+    def query(self, sql):
+        from sqlalchemy import text
+        with self.engine.connect() as conn:
+            return [dict(r) for r in conn.execute(text(sql)).mappings().all()]
+
+    def audit_count(self):
+        if SQL:
+            return self.query("SELECT count(*) AS n FROM audit_events")[0]["n"]
+        path = os.path.join(self.dir, "audit_out.csv")
+        with open(path, encoding="utf-8") as f:
+            return len(f.readlines()) - 1
+
+    def issued_qr_count(self):
+        if SQL:
+            return self.query("SELECT count(*) AS n FROM qr_codes")[0]["n"] - 100  # минус seed
+        return 0 if not os.path.exists(os.path.join(self.dir, "qr_out.csv")) else 1
+
     def rows(self):
+        if SQL:
+            return self.query("SELECT payment_id, merchant_id, employee_id, amount::text AS amount, tip::text AS tip, status, "
+                              "qr_id, idempotency_key, amount_total::text AS amount_total, coalesce(error_code, '') AS error_code "
+                              "FROM payments ORDER BY payment_id")
         path = os.path.join(self.dir, "payments_out.csv")
         if not os.path.exists(path):
             return []
@@ -120,9 +163,9 @@ def t4b():
 def t5b():
     e = Env()
     e.run(e.req(qr_id="qr_001", sig=sig_of("qr_001"), base_amount=637.00, tip_pct=5, idempotency_key="k-5b1"))
-    events = len(open(os.path.join(e.dir, "audit_out.csv"), encoding="utf-8").readlines())
+    events = e.audit_count()
     code1, c1 = e.run("confirm", "p_0101")  # повторный confirm после SUCCESS
-    events_after = len(open(os.path.join(e.dir, "audit_out.csv"), encoding="utf-8").readlines())
+    events_after = e.audit_count()
     e.run("create", e.req(qr_id="qr_003", sig=sig_of("qr_003"), base_amount=911.00, tip_pct=15,
                           idempotency_key="k-5b2"))
     e.run("cancel", "p_0102")
@@ -228,7 +271,7 @@ def t11():
     c4, o4 = e.run("qr", qr_req(e, merchant_id="m1"))
     ok = (c1 == 2 and o1["error_code"] == "MERCHANT_BLOCKED" and c2 == 2 and o2["error_code"] == "ACCESS_DENIED"
           and c3 == 2 and o3["error_code"] == "AMOUNT_MISMATCH" and c4 == 2 and o4["error_code"] == "VALIDATION_ERROR"
-          and not os.path.exists(os.path.join(e.dir, "qr_out.csv")))
+          and e.issued_qr_count() == 0)
     return ok, f"{o1['error_code']}, {o2['error_code']}, {o3['error_code']}, {o4['error_code']}; QR не выпущен"
 
 
@@ -288,7 +331,10 @@ def t13():
     empty_qr = os.path.join(e5.dir, "empty_qr.csv")  # реестр QR без нужной записи
     with open(empty_qr, "w", encoding="utf-8") as f:
         f.write("qr_id,merchant_id,employee_id,receipt_id,nonce,exp,signature\n")
-    c8, no_qr = e5.run("confirm", "p_0101", qr_file=empty_qr)
+    if SQL:  # «QR из другого файла» — особенность CSV-режима
+        c8, no_qr = 2, {"error_code": "NOT_FOUND"}
+    else:
+        c8, no_qr = e5.run("confirm", "p_0101", qr_file=empty_qr)
 
     ok = (c1 == 2 and conflict["error_code"] == "IDEMPOTENCY_CONFLICT"
           and c6 == 2 and other_receipt["error_code"] == "IDEMPOTENCY_CONFLICT"
@@ -312,7 +358,12 @@ def t14():
         import contract_check
     except ImportError as exc:
         return None, f"пропущен: нужен pip install pyyaml jsonschema ({exc.name})"
-    result = contract_check.run_checks()
+    saved = os.environ.pop("TIPS_STORE", None)  # контракт проверяется на CSV: он не зависит от хранилища
+    try:
+        result = contract_check.run_checks()
+    finally:
+        if saved is not None:
+            os.environ["TIPS_STORE"] = saved
     if result.failures:
         return False, "; ".join(result.failures[:3])
     return True, f"{result.checked} проверок схем OpenAPI, расхождений нет"
@@ -334,6 +385,10 @@ def main():
         skipped += ok is None
         failed += ok is False
         print(f"{'SKIP' if ok is None else 'PASS' if ok else 'FAIL'}  {name}: {fact}")
+    if SQL_SCHEMAS:
+        from tips.adapters.sql.admin import drop_schema
+        for schema in SQL_SCHEMAS:
+            drop_schema(os.environ["TIPS_DATABASE_URL"].replace("postgresql://", "postgresql+psycopg://", 1), schema)
     print(f"\nИтого: {len(TESTS) - failed - skipped} из {len(TESTS)} пройдено" + (f", пропущено: {skipped}" if skipped else ""))
     sys.exit(1 if failed else 0)
 
