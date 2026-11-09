@@ -2,7 +2,7 @@
 import os
 import sys
 
-from tips.adapters.provider.sandbox import SandboxProvider
+from tips.adapters.provider.sandbox import SandboxBank, SandboxProvider
 
 
 def make_provider(production):
@@ -12,7 +12,8 @@ def make_provider(production):
     if name == "sandbox":
         if production:
             sys.exit("Ошибка: песочный провайдер запрещён в production (TIPS_ENV не development)")
-        return SandboxProvider()
+        base = os.environ.get("TIPS_SANDBOX_URL")  # внешний адрес нашего /sandbox, например http://localhost:8083/sandbox
+        return SandboxProvider(SandboxBank(public_url=base) if base else None)
     if not name:
         return None
     sys.exit(f"Ошибка: неизвестный провайдер TIPS_PROVIDER={name}")

@@ -37,7 +37,9 @@ jobs:
           TIPS_TEST_DATABASE_URL: postgresql://postgres:tips@localhost:5432/tips
         run: python3 -m unittest discover -s tests -p "test_*.py"
       - name: Validate OpenAPI
-        run: openapi-spec-validator api/05_api_schemas.yaml
+        run: |
+          openapi-spec-validator api/05_api_schemas.yaml
+          openapi-spec-validator api/v2.yaml
       - name: Source data unchanged
         run: cd prototype/01_данные && md5sum -c MD5SUMS
       - name: Prototype tests and API contract

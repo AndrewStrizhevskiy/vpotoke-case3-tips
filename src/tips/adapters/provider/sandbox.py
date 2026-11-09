@@ -14,6 +14,7 @@ import json
 import secrets
 import threading
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 from tips.adapters.provider.base import (ACTION_REQUIRED, FAILED, NOT_FOUND, PROCESSING, SUCCEEDED, PaymentProvider,
                                          ProviderEvent, ProviderResult, ProviderUnavailable, RefundResult, WebhookInvalid)
@@ -30,7 +31,8 @@ def sign_webhook(secret, body, timestamp):
 class SandboxBank:
     """Банк в памяти: потокобезопасный автомат платежей, токенов, возвратов и очереди вебхуков."""
 
-    def __init__(self, webhook_secret="whsec_sandbox_for_tests", clock=None):
+    def __init__(self, webhook_secret="whsec_sandbox_for_tests", clock=None, public_url="https://sandbox.bank.example"):
+        self.public_url = public_url.rstrip("/")  # где открывается страница 3-D Secure (у живой песочницы это наш /sandbox)
         self.webhook_secret = webhook_secret
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self._lock = threading.RLock()
@@ -80,6 +82,14 @@ class SandboxBank:
             p["error"] = None if ok else "CARD_DECLINED"
             self._emit("payment.succeeded" if ok else "payment.failed", provider_payment_id)
 
+    def settle_all(self, ok=True):
+        """Ответить на все «потерянные» платежи (карта 0119); возвращает, сколько закрыто."""
+        with self._lock:
+            ids = [pid for pid, p in self.payments.items() if p["state"] == "processing"]
+        for pid in ids:
+            self.settle(pid, ok)
+        return len(ids)
+
     def drain_webhooks(self, duplicate=False, reverse=False):
         """Очередь событий в виде пар (заголовки, тело) для вебхука; duplicate повторяет, reverse меняет порядок."""
         with self._lock:
@@ -126,7 +136,7 @@ class SandboxBank:
         if state == "failed":
             return ProviderResult(FAILED, p["id"], None, p["error"], ref)
         if state == "challenge":
-            return ProviderResult(ACTION_REQUIRED, p["id"], f"https://sandbox.bank.example/3ds/{p['id']}", reference=ref)
+            return ProviderResult(ACTION_REQUIRED, p["id"], f"{self.public_url}/3ds/{p['id']}", reference=ref)
         if state == "voided":
             return ProviderResult(FAILED, p["id"], None, "CANCELED", ref)
         return ProviderResult(PROCESSING, p["id"], reference=ref)
@@ -164,10 +174,13 @@ class SandboxBank:
 
 class SandboxProvider(PaymentProvider):
     name = "sandbox"
-    action_hosts = ("sandbox.bank.example",)
 
     def __init__(self, bank=None):
         self.bank = bank or SandboxBank()
+        url = urlsplit(self.bank.public_url)
+        self.action_hosts = (url.hostname,)
+        # http разрешён только для локальной песочницы: на чужой узел без TLS плательщика не отправляем
+        self.allow_http_actions = url.scheme == "http" and url.hostname in ("localhost", "127.0.0.1")
 
     def create_payment(self, reference, amount, currency, payment_method_token, return_url, idempotency_key):
         return self.bank.create_payment(reference, amount, currency, payment_method_token, return_url, idempotency_key)

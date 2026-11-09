@@ -376,6 +376,18 @@ class V2Tests(HttpTestBase):
             self.assertEqual(client.post("/api/v1/auth/login", json={"login": "x", "password": "y"}).status_code, 401)  # вход остался
             self.assertEqual(client.get("/health").status_code, 200)
 
+    def test_env_switch_turns_v1_guest_routes_off(self):
+        for value, expected in (("off", 404), ("OFF", 404), ("on", 422), ("", 422)):
+            os.environ["TIPS_API_V1"] = value
+            try:
+                app = create_app(self.engine, self.gateway, SECRET, lambda: self.now, self.keyring, self.passwords,
+                                 limiter=Limiter(scale=1000), qr_keys=self.keys, provider=self.provider)
+            finally:
+                del os.environ["TIPS_API_V1"]
+            with TestClient(app) as client:  # пустое тело: при включённом v1 маршрут есть и отвечает ошибкой формата
+                code = client.post("/api/v1/tips", json={}, headers={"Idempotency-Key": "k"}).status_code
+            self.assertEqual(code == 404, expected == 404, (value, code))
+
     def test_v2_is_absent_without_keys(self):
         app = create_app(self.engine, self.gateway, SECRET, lambda: self.now, self.keyring, self.passwords,
                          limiter=Limiter(scale=1000))

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Чаевые</title>
+<link rel="stylesheet" href="/p/style.css">
+</head>
+<body data-sandbox="__SANDBOX__">
+<main>
+  <h1 id="brand">Чаевые</h1>
+
+  <section id="s-loading" aria-live="polite"><p class="muted">Открываем оплату…</p></section>
+
+  <!-- Экран 1: приветствие -->
+  <section id="s-welcome" hidden>
+    <p class="lead">Спасибо, что были у нас!</p>
+    <dl class="facts">
+      <dt>Заведение</dt><dd id="w-merchant"></dd>
+      <dt>Официант</dt><dd id="w-employee"></dd>
+      <dt>Чек</dt><dd id="w-receipt"></dd>
+      <dt>Сумма чека</dt><dd id="w-base"></dd>
+    </dl>
+    <button id="b-continue" class="primary" type="button">Продолжить</button>
+  </section>
+
+  <!-- Экран 2: выбор чаевых -->
+  <section id="s-tip" hidden>
+    <h2>Чаевые официанту</h2>
+    <div id="tip-options" class="options" role="group" aria-label="Размер чаевых"></div>
+    <label class="custom">Своя сумма, ₽
+      <input id="tip-custom" inputmode="decimal" autocomplete="off" placeholder="например 120">
+    </label>
+    <p id="tip-error" class="error" role="alert" hidden></p>
+    <dl class="facts total">
+      <dt>Чек</dt><dd id="t-base"></dd>
+      <dt>Чаевые</dt><dd id="t-tip"></dd>
+      <dt>Итого</dt><dd id="t-total"></dd>
+    </dl>
+    <button id="b-to-confirm" class="primary" type="button">Оплатить</button>
+  </section>
+
+  <!-- Экран 3: подтверждение и карта -->
+  <section id="s-confirm" hidden>
+    <h2>Подтверждение</h2>
+    <dl class="facts total">
+      <dt>Чек</dt><dd id="c-base"></dd>
+      <dt>Чаевые</dt><dd id="c-tip"></dd>
+      <dt>К оплате</dt><dd id="c-total"></dd>
+    </dl>
+    <fieldset id="card-box">
+      <legend>Карта (тестовая песочница)</legend>
+      <label>Номер карты <input id="card-number" inputmode="numeric" autocomplete="off" maxlength="23" placeholder="4242 4242 4242 4242"></label>
+      <div class="row">
+        <label>Срок <input id="card-exp" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="12/30"></label>
+        <label>CVC <input id="card-cvc" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="123"></label>
+      </div>
+      <p class="muted small">Данные карты отправляются только платёжному провайдеру; сервис чаевых получает от него одноразовый токен.</p>
+    </fieldset>
+    <p id="confirm-error" class="error" role="alert" hidden></p>
+    <button id="b-pay" class="primary" type="button">Подтвердить оплату</button>
+    <button id="b-back" class="secondary" type="button">Назад</button>
+  </section>
+
+  <!-- Экран 4: результат -->
+  <section id="s-result" hidden aria-live="polite">
+    <div id="r-icon" class="icon" aria-hidden="true"></div>
+    <h2 id="r-title"></h2>
+    <p id="r-text"></p>
+    <button id="b-retry" class="secondary" type="button" hidden>Повторить</button>
+  </section>
+</main>
+<script type="module" src="/p/app.js"></script>
+</body>
+</html>

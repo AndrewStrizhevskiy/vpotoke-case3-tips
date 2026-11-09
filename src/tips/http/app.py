@@ -34,7 +34,7 @@ from tips.domain.errors import PaymentError, RateLimited, Unauthenticated
 from tips.adapters.provider.factory import make_provider
 from tips.domain import ids
 from tips.domain.qr_v2 import QrV2Keys
-from tips.http import auth, guard, v2
+from tips.http import auth, guard, pages, v2
 from tips.http.limits import Limiter, client_ip, proxy_hops_from_env
 from tips.http.errors import error_body, http_error_handler, payment_error_handler, validation_error_handler
 from tips.http.serialize import payment_json, qr_view_json
@@ -81,10 +81,12 @@ def matches(pattern, value):
 
 def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None, passwords=None,
                limiter=None, proxy_hops=None, production=None, cors_origins=None, qr_keys=None, provider=None,
-               front_url=None, enable_v1=True):
+               front_url=None, enable_v1=None):
     """Собрать приложение. Параметры нужны тестам: свой движок, шлюз, ключи, часы (QR из seed истекли в 2025 году)
     и лимиты. Настройки среды: TIPS_ENV (production по умолчанию: документация API и HSTS; development открывает
     /docs), TIPS_TRUSTED_PROXY_HOPS (сколько прокси перед сервисом), TIPS_CORS_ORIGINS (список источников)."""
+    if enable_v1 is None:  # TIPS_API_V1=off выключает гостевые операции v1
+        enable_v1 = os.environ.get("TIPS_API_V1", "on").lower() != "off"
     if production is None:
         production = os.environ.get("TIPS_ENV", "production") != "development"
     if cors_origins is None:
@@ -352,10 +354,16 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
         return {"merchant_id": merchant_id, "status": status}
 
     if app.state.qr_keys is not None:
-        v2.install(app, types.SimpleNamespace(
+        helpers = types.SimpleNamespace(
             store=store, rate=rate, bad_signature_gate=bad_signature_gate, note_bad_signature=note_bad_signature,
             principal=principal, read_json=read_json, invalid=invalid, matches=matches, no_store=NO_STORE,
-            max_body=guard.MAX_BODY))
+            max_body=guard.MAX_BODY)
+        v2.install(app, helpers)
+        sandbox_on = (not production and getattr(app.state.provider, "name", None) == "sandbox"
+                      and hasattr(app.state.provider, "bank"))
+        pages.install(app, helpers, sandbox_on)
+        if sandbox_on:
+            pages.install_sandbox(app, helpers)
     if not enable_v1:  # после перехода клиентов на v2 гостевые операции v1 отключаются; вход и отчёты остаются
         v1_guest = {"/api/v1/qr", "/api/v1/qr/{qr_id}", "/api/v1/tips", "/api/v1/payments/{payment_id}",
                     "/api/v1/payments/{payment_id}/confirm", "/api/v1/payments/{payment_id}/cancel"}

@@ -4,13 +4,17 @@
 потому что в нём был бы адрес целиком, а в нём подпись QR.
 """
 import os
+import sys
 
 import uvicorn
 
-from tips.http import logs
+from tips.http import logs, prodcheck
 from tips.http.app import create_app
 
 if __name__ == "__main__":
+    bad = prodcheck.problems(os.environ)
+    if bad:
+        sys.exit("Ошибка: небезопасная конфигурация для production:\n  - " + "\n  - ".join(bad))
     logs.install()
     uvicorn.run(create_app(), host=os.environ.get("TIPS_HOST", "127.0.0.1"), port=int(os.environ.get("TIPS_PORT", "8083")),
                 access_log=False, log_config=None)

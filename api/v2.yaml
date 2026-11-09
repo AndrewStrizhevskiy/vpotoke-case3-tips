@@ -1,0 +1,345 @@
+# API платформы чаевых, версия 2.
+#
+# Отличия от v1 (api/05_api_schemas.yaml):
+#   - идентификаторы непрозрачные: qr_<26 символов>, pay_<26 символов>; внутренних m_/e_ в ответах гостю нет;
+#   - деньги строками "123.45": число JSON теряет точность и допускает 1e2;
+#   - подпись QR 22 символа, ссылка несёт её во фрагменте (#q=..&s=..): фрагмент не уходит на сервер и в Referer;
+#   - ключ идемпотентности только заголовком Idempotency-Key, UUIDv4 в каноническом виде;
+#   - карта вводится у провайдера, сервис получает только одноразовый payment_method_token; PAN и CVV сюда не попадают;
+#   - 3-D Secure и поздние ответы банка: статус PENDING и next_action; итог приходит вебхуком или опросом;
+#   - двойная оплата одного QR закрывается возвратом (REFUND_PENDING, REFUNDED);
+#   - QR v1 и v2 несовместимы в обе стороны.
+# Вход, обновление токена и отчёты общие для версий и описаны в v1 (/api/v1/auth/*, /api/v1/reports/*).
+# Проверка: python tests/test_v2_contract.py (схема валидна, ответы живого сервиса проходят схемы).
+
+openapi: 3.0.3
+info:
+  title: Tips Platform v2
+  version: "2.0.0"
+  description: Онлайн-чаевые, гостевой поток через платёжного провайдера
+
+servers:
+  - url: http://localhost:8083
+
+tags:
+  - name: qr
+  - name: payments
+  - name: webhooks
+
+components:
+  schemas:
+    QrId: {type: string, pattern: '^qr_[0-9a-hjkmnp-tv-z]{26}$'}
+    PaymentId: {type: string, pattern: '^pay_[0-9a-hjkmnp-tv-z]{26}$'}
+    Money:
+      type: string
+      pattern: '^(0|[1-9][0-9]{0,6})\.[0-9]{2}$'
+      description: Рубли строкой с двумя знаками после точки, без пробелов и экспоненты
+      example: "637.00"
+    Signature: {type: string, pattern: '^[A-Za-z0-9_-]{22}$'}
+    Timestamp: {type: string, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'}
+
+    PaymentStatus:
+      type: string
+      enum: [CREATED, PENDING, SUCCESS, DECLINED, CANCELED, REFUND_PENDING, REFUNDED]
+
+    QrIssueRequest:
+      type: object
+      additionalProperties: false
+      required: [merchant_id, employee_id, receipt_id]
+      properties:
+        merchant_id: {type: string, pattern: '^m_[0-9a-z]{3,32}$'}
+        employee_id: {type: string, pattern: '^e_[0-9a-z]{3,32}$'}
+        receipt_id: {type: string, pattern: '^[A-Za-z0-9._-]{1,64}$'}
+
+    QrIssued:
+      type: object
+      additionalProperties: false
+      required: [qr_id, pay_url, exp]
+      properties:
+        qr_id: {$ref: '#/components/schemas/QrId'}
+        pay_url:
+          type: string
+          pattern: '^https?://[^#?]+#q=qr_[0-9a-hjkmnp-tv-z]{26}&s=[A-Za-z0-9_-]{22}$'
+          description: Ссылка для QR-кода; идентификатор и подпись во фрагменте
+        exp: {$ref: '#/components/schemas/Timestamp'}
+
+    QrView:
+      type: object
+      additionalProperties: false
+      required: [merchant_name, employee_name, receipt_id, base_amount, currency, tip_options, max_tip_percent, exp]
+      properties:
+        merchant_name: {type: string}
+        employee_name: {type: string}
+        receipt_id: {type: string}
+        base_amount: {$ref: '#/components/schemas/Money'}
+        currency: {type: string, enum: [RUB]}
+        tip_options:
+          type: array
+          items: {type: integer, minimum: 0, maximum: 50}
+        max_tip_percent: {type: integer}
+        exp: {$ref: '#/components/schemas/Timestamp'}
+
+    PaymentCreate:
+      type: object
+      additionalProperties: false
+      required: [qr_id, sig, base_amount]
+      description: Ровно одно из tip_percent или tip_amount; base_amount обязана совпасть с суммой чека
+      properties:
+        qr_id: {$ref: '#/components/schemas/QrId'}
+        sig: {$ref: '#/components/schemas/Signature'}
+        receipt_id: {type: string, pattern: '^[A-Za-z0-9._-]{1,64}$'}
+        base_amount: {$ref: '#/components/schemas/Money'}
+        tip_percent: {type: integer, minimum: 0, maximum: 50}
+        tip_amount: {$ref: '#/components/schemas/Money'}
+
+    PaymentConfirm:
+      type: object
+      additionalProperties: false
+      required: [payment_method_token]
+      properties:
+        payment_method_token: {type: string, pattern: '^[A-Za-z0-9_-]{8,128}$'}
+
+    NextAction:
+      type: object
+      additionalProperties: false
+      required: [type, url]
+      properties:
+        type: {type: string, enum: [redirect]}
+        url: {type: string, format: uri}
+
+    Payment:
+      type: object
+      additionalProperties: false
+      required: [payment_id, qr_id, status, base_amount, tip_amount, amount_total, currency, error_code, next_action, created_at]
+      properties:
+        payment_id: {$ref: '#/components/schemas/PaymentId'}
+        qr_id: {$ref: '#/components/schemas/QrId'}
+        status: {$ref: '#/components/schemas/PaymentStatus'}
+        base_amount: {$ref: '#/components/schemas/Money'}
+        tip_amount: {$ref: '#/components/schemas/Money'}
+        amount_total: {$ref: '#/components/schemas/Money'}
+        currency: {type: string, enum: [RUB]}
+        error_code: {type: string, nullable: true}
+        next_action:
+          allOf: [{$ref: '#/components/schemas/NextAction'}]
+          nullable: true
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+        confirm_token:
+          type: string
+          pattern: '^[0-9a-f]{32}$'
+          description: Только в ответе на создание; передаётся заголовком X-Payment-Token, повтор создания выдаёт новый
+
+    PaymentCreated:
+      description: Платёж с токеном подтверждения (confirm_token есть только в ответе на создание)
+      allOf: [{$ref: '#/components/schemas/Payment'}]
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error_code, message, retryable]
+      properties:
+        error_code:
+          type: string
+          enum: [VALIDATION_ERROR, INVALID_QR, QR_EXPIRED, QR_USED, MERCHANT_BLOCKED, RECEIPT_MISMATCH, AMOUNT_MISMATCH,
+                 AMOUNT_OUT_OF_RANGE, TIP_OUT_OF_RANGE, IDEMPOTENCY_CONFLICT, PAYMENT_IN_PROGRESS, RATE_LIMITED,
+                 INTERNAL_ERROR, CANCEL_NOT_ALLOWED, PAYMENT_STATE_CONFLICT, NOT_FOUND, ACCESS_DENIED]
+        message: {type: string}
+        retryable: {type: boolean}
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'}
+      description: UUIDv4 строчными буквами; повтор с тем же телом возвращает тот же платёж
+    PaymentToken:
+      name: X-Payment-Token
+      in: header
+      required: true
+      schema: {type: string}
+    PaymentIdPath:
+      name: payment_id
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/PaymentId'}
+
+  responses:
+    BadRequest:
+      description: VALIDATION_ERROR
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Unauthorized:
+      description: ACCESS_DENIED, нет действительных учётных данных
+      headers: {WWW-Authenticate: {schema: {type: string}}}
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Forbidden:
+      description: MERCHANT_BLOCKED или ACCESS_DENIED
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    NotFound:
+      description: NOT_FOUND (неверный токен, чужой платёж и несуществующий id неотличимы)
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Conflict:
+      description: QR_USED, IDEMPOTENCY_CONFLICT, PAYMENT_IN_PROGRESS, CANCEL_NOT_ALLOWED, PAYMENT_STATE_CONFLICT
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Gone:
+      description: QR_EXPIRED
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Unprocessable:
+      description: INVALID_QR, AMOUNT_MISMATCH, TIP_OUT_OF_RANGE, AMOUNT_OUT_OF_RANGE
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    TooManyRequests:
+      description: RATE_LIMITED
+      headers: {Retry-After: {schema: {type: integer}}}
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    InternalError:
+      description: INTERNAL_ERROR
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Unavailable:
+      description: Платёжный провайдер не подключён; повторите позже
+      headers: {Retry-After: {schema: {type: integer}}}
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+
+paths:
+  /api/v2/qr:
+    post:
+      tags: [qr]
+      summary: Выпустить QR на чек (официант своего заведения, менеджер, админ)
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/QrIssueRequest'}}}
+      responses:
+        '201':
+          description: QR выпущен; на чек один живой QR, повторный запрос вернёт тот же
+          content: {application/json: {schema: {$ref: '#/components/schemas/QrIssued'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /api/v2/qr/{qr_id}:
+    get:
+      tags: [qr]
+      summary: Данные для формы чаевых
+      parameters:
+        - {name: qr_id, in: path, required: true, schema: {$ref: '#/components/schemas/QrId'}}
+        - {name: s, in: query, required: true, schema: {$ref: '#/components/schemas/Signature'}}
+      responses:
+        '200':
+          description: Форма
+          content: {application/json: {schema: {$ref: '#/components/schemas/QrView'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '410': {$ref: '#/components/responses/Gone'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /api/v2/payments:
+    post:
+      tags: [payments]
+      summary: Создать платёж (без списания)
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/PaymentCreate'}}}
+      responses:
+        '200':
+          description: Повтор с тем же ключом и телом; выдан новый токен, прежний перестаёт действовать
+          content: {application/json: {schema: {$ref: '#/components/schemas/PaymentCreated'}}}
+        '201':
+          description: Платёж создан
+          content: {application/json: {schema: {$ref: '#/components/schemas/PaymentCreated'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '410': {$ref: '#/components/responses/Gone'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /api/v2/payments/{payment_id}:
+    get:
+      tags: [payments]
+      summary: Статус платежа; опрос сам обновляет платёж у провайдера
+      parameters:
+        - {$ref: '#/components/parameters/PaymentIdPath'}
+        - {$ref: '#/components/parameters/PaymentToken'}
+      responses:
+        '200':
+          description: Платёж
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /api/v2/payments/{payment_id}/confirm:
+    post:
+      tags: [payments]
+      summary: Подтвердить платёж токеном карты
+      parameters:
+        - {$ref: '#/components/parameters/PaymentIdPath'}
+        - {$ref: '#/components/parameters/PaymentToken'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/PaymentConfirm'}}}
+      responses:
+        '200':
+          description: SUCCESS, либо повтор уже подтверждённого платежа
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '202':
+          description: PENDING; при next_action.type=redirect отправьте плательщика на 3-D Secure, итог опросом или вебхуком
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '402':
+          description: DECLINED, банк отказал
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+
+  /api/v2/payments/{payment_id}/cancel:
+    post:
+      tags: [payments]
+      summary: Отменить платёж, пока он не отправлен в банк
+      parameters:
+        - {$ref: '#/components/parameters/PaymentIdPath'}
+        - {$ref: '#/components/parameters/PaymentToken'}
+      responses:
+        '200':
+          description: CANCELED либо итоговое состояние платежа
+          content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /api/v2/webhooks/{provider}:
+    post:
+      tags: [webhooks]
+      summary: Вебхук провайдера (подпись в заголовке, t=<unix>,v1=<hmac>; допуск 300 с)
+      parameters:
+        - {name: provider, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object}}}
+      responses:
+        '200': {description: "Событие принято, в том числе повтор"}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}

@@ -62,7 +62,8 @@ def confirm_payment_v2(payment, store, provider, payment_method_token, return_ur
 def _allowed_action(provider, url):
     from urllib.parse import urlsplit
     parts = urlsplit(url or "")
-    return parts.scheme == "https" and parts.hostname in provider.action_hosts
+    secure = parts.scheme == "https" or (parts.scheme == "http" and getattr(provider, "allow_http_actions", False))
+    return secure and parts.hostname in provider.action_hosts
 
 
 def apply_provider_status(store, payment_id, result, provider, now, actor):
