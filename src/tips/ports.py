@@ -10,6 +10,7 @@ Row = Dict[str, str]
 class Catalog(Protocol):
     """Справочники и реестр чеков (только чтение)."""
 
+    def merchant(self, merchant_id: str) -> Optional[Row]: ...
     def merchant_status(self, merchant_id: str) -> Optional[str]: ...
     def employee(self, employee_id: str) -> Optional[Row]: ...
     def find_qr(self, qr_id: str) -> Optional[Row]: ...
@@ -43,6 +44,20 @@ class PaymentStore(Protocol):
         ...
 
 
+class TokenStore(Protocol):
+    """Токен платежа: хранится только хеш (ADR-003)."""
+
+    def set_confirm_token(self, payment_id: str, token_hash: bytes) -> None: ...
+    def confirm_token_hash(self, payment_id: str) -> Optional[bytes]: ...
+
+
+class AdminStore(Protocol):
+    def set_merchant_status(self, merchant_id: str, new_status: str, reason: str,
+                            actor: str, now: datetime) -> Optional[str]:
+        """Меняет статус и пишет событие; возвращает прежний статус или None, если мерчанта нет."""
+        ...
+
+
 class QrStore(Protocol):
     """QR и чеки, выпущенные платформой."""
 
@@ -50,7 +65,7 @@ class QrStore(Protocol):
     def add_qr(self, qr: Row) -> None: ...
 
 
-class Store(Catalog, PaymentStore, QrStore, Protocol):
+class Store(Catalog, PaymentStore, QrStore, TokenStore, AdminStore, Protocol):
     pass
 
 

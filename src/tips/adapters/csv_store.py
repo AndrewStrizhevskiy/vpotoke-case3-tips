@@ -99,6 +99,12 @@ class CsvStore:
         self.add_audit(payment, action, old, actor, now)
     # ---- справочники и реестр чеков (Catalog) ----
 
+    def merchant(self, merchant_id):
+        for row in read_csv(os.path.join(self.data_dir, "merchants.csv")):
+            if row["merchant_id"] == merchant_id:
+                return row
+        return None
+
     def merchant_status(self, merchant_id):
         for row in read_csv(os.path.join(self.data_dir, "merchants.csv")):
             if row["merchant_id"] == merchant_id:

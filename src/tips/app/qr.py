@@ -4,13 +4,19 @@ import secrets
 from tips.config import PAY_URL
 from tips.domain.errors import PaymentError
 from tips.domain.money import MAX_BASE, fmt
-from tips.domain.qr_sign import QR_TTL, TIME_FMT, compute_signature, parse_time
+from tips.domain.qr_sign import QR_TTL, TIME_FMT, check_exp, compute_signature, parse_time, verify_signature
 from tips.domain.validation import validate_qr_request
 
+TIP_OPTIONS = [0, 5, 10, 15, 20]  # кнопки формы; «своя сумма» вводится отдельно, лимит 50 %
+MAX_TIP_PCT = 50
 
-def create_qr(req, secret, store, now, renderer=None):
-    """Выпуск QR на чек. Проверки: мерчант ACTIVE, официант этого мерчанта, чек не меняет сумму."""
-    amount = validate_qr_request(req)
+
+def create_qr(req, secret, store, now, renderer=None, amount_required=True):
+    """Выпуск QR на чек. Проверки: мерчант ACTIVE, официант этого мерчанта, чек не меняет сумму.
+
+    amount_required=False (HTTP): суммы в запросе нет, чек должен уже лежать в реестре, иначе NOT_FOUND.
+    """
+    amount = validate_qr_request(req, amount_required)
     merchant_id, employee_id, receipt_id = req["merchant_id"], req["employee_id"], req["receipt_id"]
     status = store.merchant_status(merchant_id)
     if status is None:
@@ -22,6 +28,10 @@ def create_qr(req, secret, store, now, renderer=None):
         raise PaymentError("NOT_FOUND")
     if employee["merchant_id"] != merchant_id:
         raise PaymentError("ACCESS_DENIED")
+    if amount is None:
+        amount = store.receipt_amount(merchant_id, receipt_id)
+        if amount is None:
+            raise PaymentError("NOT_FOUND")
     if not (0 < amount <= MAX_BASE):
         raise PaymentError("AMOUNT_OUT_OF_RANGE")
     known = store.receipt_amount(merchant_id, receipt_id)
@@ -52,3 +62,25 @@ def qr_result(qr, new, renderer=None):
     url = f"{PAY_URL}?qr={qr['qr_id']}&sig={qr['signature']}"
     png = renderer.render(url, qr["qr_id"]) if renderer else None
     return {"qr_id": qr["qr_id"], "pay_url": url, "exp": qr["exp"], "new": new, "png": png}
+
+
+def get_qr_view(qr_id, sig, secret, store, now):
+    """Данные для формы чаевых (экраны 1-2). Порядок Q-1…Q-4 как у платежа; сумма чека из реестра, не от клиента."""
+    qr = store.find_qr(qr_id)
+    if qr is None or not verify_signature(secret, qr, sig):  # неверная подпись не раскрывает, есть ли такой qr_id
+        raise PaymentError("INVALID_QR")
+    if not check_exp(qr, now):
+        raise PaymentError("QR_EXPIRED")
+    if any(p["status"] == "SUCCESS" for p in store.payments_for_qr(qr_id)):
+        raise PaymentError("QR_USED")
+    merchant = store.merchant(qr["merchant_id"])
+    if merchant is None or merchant["status"] != "ACTIVE":
+        raise PaymentError("MERCHANT_BLOCKED")
+    employee = store.employee(qr["employee_id"])
+    amount = store.receipt_amount(qr["merchant_id"], qr["receipt_id"])
+    if employee is None or amount is None:
+        raise PaymentError("NOT_FOUND")
+    return {"qr_id": qr_id, "merchant_id": merchant["merchant_id"], "merchant_name": merchant["name"],
+            "employee_id": employee["employee_id"], "employee_name": employee["name"],
+            "receipt_id": qr["receipt_id"], "base_amount": amount, "currency": "RUB",
+            "tip_options": TIP_OPTIONS, "max_tip_pct": MAX_TIP_PCT, "exp": qr["exp"]}

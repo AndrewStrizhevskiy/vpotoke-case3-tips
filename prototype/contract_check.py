@@ -113,8 +113,8 @@ def tip(qr_id, base, **extra):
 
 
 def api_request(body):
-    """То, что ушло бы в API: служебное поле sig живёт в URL QR, а не в теле TipCreate."""
-    return {k: v for k, v in body.items() if k != "sig"}
+    """То, что уходит в API: подпись из ссылки QR входит в тело TipCreate (контракт v1.1)."""
+    return dict(body)
 
 
 def pay_amount(qr_id):

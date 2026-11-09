@@ -27,13 +27,18 @@ def validate_request(req):
     return key
 
 
-def validate_qr_request(req):
-    """Формат запроса на выпуск QR; сумма чека приходит от кассы (в прототипе — из запроса)."""
+def validate_qr_request(req, amount_required=True):
+    """Формат запроса на выпуск QR; сумма чека приходит от кассы (в прототипе — из запроса).
+
+    Без amount_required сумма в запросе не нужна (HTTP): её берут из реестра чеков, и функция возвращает None.
+    """
     if not isinstance(req, dict):
         raise PaymentError("VALIDATION_ERROR")
     for key, pattern in (("merchant_id", r"m_\d{3}"), ("employee_id", r"e_\d{3}"), ("receipt_id", r"r_\d{4}")):
         if not isinstance(req.get(key), str) or not re.fullmatch(pattern, req[key]):
             raise PaymentError("VALIDATION_ERROR")
+    if not amount_required and "amount" not in req:
+        return None
     if "amount" not in req or isinstance(req["amount"], bool):
         raise PaymentError("VALIDATION_ERROR")
     return to_money(req["amount"])

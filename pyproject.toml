@@ -7,7 +7,8 @@ dependencies = []
 
 [project.optional-dependencies]
 sql = ["sqlalchemy>=2.0", "psycopg[binary]>=3.1", "alembic>=1.13"]
-dev = ["ruff", "pyyaml", "jsonschema", "openapi-spec-validator", "tips[sql]"]
+http = ["fastapi>=0.110", "uvicorn>=0.29"]
+dev = ["ruff", "pyyaml", "jsonschema", "openapi-spec-validator", "httpx", "tips[sql,http]"]
 local-db = ["pgserver"]  # встроенный PostgreSQL для локальных тестов без Docker
 
 [tool.setuptools.packages.find]

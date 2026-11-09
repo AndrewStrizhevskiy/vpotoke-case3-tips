@@ -7,7 +7,6 @@
 """
 import os
 import sys
-import tempfile
 import threading
 import time
 import unittest
@@ -15,7 +14,9 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "src"))
+sys.path.insert(0, HERE)
 
 try:
     import sqlalchemy  # noqa: F401
@@ -30,29 +31,14 @@ if HAVE_SQL:
 
     from tips.adapters.gateway.emulator import EmulatorGateway
     from tips.adapters.sql.admin import bootstrap, drop_schema
-    from tips.adapters.sql.engine import normalize_url
     from tips.adapters.sql.store import SqlStore
     from tips.app.payments import cancel_payment, confirm_payment, create_payment, find_payment
     from tips.domain.errors import PaymentError
     from tips.jobs.reconcile import reconcile
+    from support import database_url
 
 NOW = datetime(2025, 11, 1, 18, 0, 0, tzinfo=timezone.utc)
 SECRET = os.environ.get("TIPS_HMAC_SECRET", "").encode()
-_server = None
-
-
-def database_url():
-    global _server
-    url = os.environ.get("TIPS_TEST_DATABASE_URL")
-    if url:
-        return normalize_url(url)
-    try:
-        import pgserver
-    except ImportError:
-        return None
-    if _server is None:
-        _server = pgserver.get_server(tempfile.mkdtemp(prefix="tips_pg_"), cleanup_mode="stop")
-    return normalize_url(_server.get_uri())
 
 
 class SlowGateway:

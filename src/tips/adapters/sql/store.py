@@ -70,6 +70,10 @@ class SqlStore:
 
     # ---- справочники и реестр чеков ----
 
+    def merchant(self, merchant_id):
+        return self._one("SELECT merchant_id, name, status, description FROM merchants WHERE merchant_id = :id",
+                         id=merchant_id)
+
     def merchant_status(self, merchant_id):
         row = self._one("SELECT status FROM merchants WHERE merchant_id = :id", id=merchant_id)
         return row["status"] if row else None
@@ -160,6 +164,28 @@ class SqlStore:
             payment["status"] = new_status
             payment["error_code"] = error or ""
             self._audit(payment, action, old, actor, now)
+
+    # ---- токен платежа и администрирование ----
+
+    def set_confirm_token(self, payment_id, token_hash):
+        self._run("UPDATE payments SET confirm_token_hash = :h WHERE payment_id = :id", h=token_hash, id=payment_id)
+
+    def confirm_token_hash(self, payment_id):
+        row = self._one("SELECT confirm_token_hash FROM payments WHERE payment_id = :id", id=payment_id)
+        value = row["confirm_token_hash"] if row else None
+        return bytes(value) if value is not None else None
+
+    def set_merchant_status(self, merchant_id, new_status, reason, actor, now):
+        with self.atomic():
+            row = self._one("SELECT status FROM merchants WHERE merchant_id = :id FOR UPDATE", id=merchant_id)
+            if row is None:
+                return None
+            old = row["status"]
+            self._run("UPDATE merchants SET status = :s WHERE merchant_id = :id", s=new_status, id=merchant_id)
+            self._run("INSERT INTO merchant_status_events (merchant_id, old_status, new_status, reason, actor, at) "
+                      "VALUES (:m, :old, :new, :reason, :actor, CAST(:at AS timestamptz))",
+                      m=merchant_id, old=old, new=new_status, reason=reason, actor=actor, at=now.strftime(TIME_FMT))
+            return old
 
     # ---- QR и чеки, выпущенные платформой ----
 
