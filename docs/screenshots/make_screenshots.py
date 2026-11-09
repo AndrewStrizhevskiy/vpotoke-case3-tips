@@ -18,8 +18,9 @@ from PIL import Image, ImageColor, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+# шрифт можно задать вручную (macOS): SHOT_FONT=/путь/DejaVuSansMono.ttf SHOT_FONT_BOLD=/путь/DejaVuSansMono-Bold.ttf
+FONT = os.environ.get("SHOT_FONT", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf")
+FONT_BOLD = os.environ.get("SHOT_FONT_BOLD", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf")
 SIZE, PAD, BAR, COLS = 22, 30, 48, 112
 
 BG, BAR_BG, FG = "#14181F", "#222833", "#E6E8EB"
