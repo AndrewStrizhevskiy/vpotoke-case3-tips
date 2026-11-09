@@ -254,6 +254,28 @@ class SqlStore:
                   "attempts = attempts + :a, updated_at = CAST(:t AS timestamptz) WHERE refund_id = :r",
                   s=status, prid=provider_refund_id, a=1 if attempt else 0, t=now.strftime(TIME_FMT), r=refund_id)
 
+    def metrics_snapshot(self, now):
+        """Счётчики для /metrics: платежи по статусам, возраст зависших, очереди событий и возвратов."""
+        stamp = now.strftime(TIME_FMT)
+        by = {r["status"]: int(r["n"]) for r in self._run("SELECT status, count(*) AS n FROM payments GROUP BY status")}
+
+        def age(table_filter, col):
+            row = self._one(f"SELECT COALESCE(EXTRACT(EPOCH FROM (CAST(:t AS timestamptz) - min({col}))), 0)::bigint AS s "
+                            f"FROM payments WHERE {table_filter}", t=stamp)
+            return max(0, int(row["s"]))
+
+        count = lambda sql: int(self._one(sql)["n"])  # noqa: E731
+        return {
+            "payments": by,
+            "oldest_pending": age("status = 'PENDING'", "submitted_at"),
+            "oldest_created": age("status = 'CREATED'", "created_at"),
+            "inbox_backlog": count("SELECT count(*) AS n FROM gateway_events WHERE processed_at IS NULL AND attempts < 10"),
+            "inbox_stuck": count("SELECT count(*) AS n FROM gateway_events WHERE processed_at IS NULL AND attempts >= 10"),
+            "refunds_open": count("SELECT count(*) AS n FROM refunds WHERE status IN ('REQUIRED', 'PENDING') AND attempts < 5"),
+            "refunds_stuck": count("SELECT count(*) AS n FROM refunds WHERE status IN ('REQUIRED', 'PENDING', 'FAILED') "
+                                   "AND attempts >= 5"),
+        }
+
     # ---- лимиты запросов ----
 
     def hit(self, bucket, window_seconds, now):

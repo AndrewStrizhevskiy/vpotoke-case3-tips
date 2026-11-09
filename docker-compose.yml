@@ -1,0 +1,50 @@
+# Промышленная схема на одной машине: база, миграции, сервис, воркер сверки. TLS и публичный адрес даёт прокси перед сервисом.
+# Запуск: cp deploy/env.example deploy/.env (заполнить секреты), затем docker compose --env-file deploy/.env up -d
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tips
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD}
+      POSTGRES_DB: tips
+    volumes: ["dbdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tips -d tips"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: .
+    command: ["python", "-m", "tips.adapters.sql.admin", "migrate"]
+    env_file: deploy/.env
+    environment: &dburl
+      TIPS_DATABASE_URL: postgresql+psycopg://tips:${POSTGRES_PASSWORD}@db:5432/tips
+    depends_on: {db: {condition: service_healthy}}
+    restart: "no"
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: deploy/.env
+    environment: *dburl
+    ports: ["127.0.0.1:8083:8083"]   # наружу только через прокси на этой машине
+    depends_on: {migrate: {condition: service_completed_successfully}}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "tips.jobs.worker", "--interval", "30"]
+    env_file: deploy/.env
+    environment: *dburl
+    depends_on: {migrate: {condition: service_completed_successfully}}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  dbdata:

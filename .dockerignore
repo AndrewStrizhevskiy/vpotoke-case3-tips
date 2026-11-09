@@ -1,0 +1,11 @@
+.venv
+.git
+__pycache__
+*.pyc
+submission
+case
+diagrams
+prototype
+tests
+docs
+.env*

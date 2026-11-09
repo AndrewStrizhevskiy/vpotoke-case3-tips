@@ -47,6 +47,7 @@ class ProdCheckTests(unittest.TestCase):
             "TIPS_JWT_KID": None,
             "TIPS_DATABASE_URL": None,
             "TIPS_CORS_ORIGINS": "*",
+            "TIPS_METRICS_TOKEN": "short",
         }
         for name, value in cases.items():
             with self.subTest(name):

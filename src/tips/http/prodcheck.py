@@ -49,6 +49,8 @@ def problems(environ):
         out.append("TIPS_JWT_KID и TIPS_JWT_PRIVATE_KEY обязательны (генератор: python -m tips.http.keys)")
     if not environ.get("TIPS_DATABASE_URL"):
         out.append("TIPS_DATABASE_URL обязателен")
+    if environ.get("TIPS_METRICS_TOKEN") and len(environ["TIPS_METRICS_TOKEN"]) < 24:
+        out.append("TIPS_METRICS_TOKEN короче 24 символов")
     for origin in (o.strip() for o in environ.get("TIPS_CORS_ORIGINS", "").split(",") if o.strip()):
         if origin == "*" or not origin.startswith("https://"):
             out.append(f"TIPS_CORS_ORIGINS: «{origin}» недопустим (только https-источники, без звёздочки)")

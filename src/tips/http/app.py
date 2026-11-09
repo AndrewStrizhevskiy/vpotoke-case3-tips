@@ -34,7 +34,7 @@ from tips.domain.errors import PaymentError, RateLimited, Unauthenticated
 from tips.adapters.provider.factory import make_provider
 from tips.domain import ids
 from tips.domain.qr_v2 import QrV2Keys
-from tips.http import auth, guard, pages, v2
+from tips.http import auth, guard, metrics, pages, v2
 from tips.http.limits import Limiter, client_ip, proxy_hops_from_env
 from tips.http.errors import error_body, http_error_handler, payment_error_handler, validation_error_handler
 from tips.http.serialize import payment_json, qr_view_json
@@ -364,6 +364,9 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
         pages.install(app, helpers, sandbox_on)
         if sandbox_on:
             pages.install_sandbox(app, helpers)
+    metrics_token = metrics.token_from_env()
+    if metrics_token:
+        metrics.install(app, types.SimpleNamespace(store=store, no_store=NO_STORE), metrics_token)
     if not enable_v1:  # после перехода клиентов на v2 гостевые операции v1 отключаются; вход и отчёты остаются
         v1_guest = {"/api/v1/qr", "/api/v1/qr/{qr_id}", "/api/v1/tips", "/api/v1/payments/{payment_id}",
                     "/api/v1/payments/{payment_id}/confirm", "/api/v1/payments/{payment_id}/cancel"}
