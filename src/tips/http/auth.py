@@ -1,36 +1,12 @@
-"""Кто вызывает защищённые операции и что ему можно.
+"""Что можно делать каждой роли. Кто вызывает, определяет app/auth.py (JWT и пользователь в базе).
 
-Правила доступа (authorize_*) окончательные. Источник личности временный: в M3 это заголовки X-Dev-Role,
-X-Dev-Merchant, X-Dev-Employee, и только если явно включено TIPS_DEV_AUTH=1. По умолчанию защищённые
-операции отвечают 401. В M4 здесь появится проверка JWT, правила доступа останутся прежними.
+Правила доступа (authorize_*) не зависят от способа входа: принимают Principal и идентификаторы из запроса.
+Принцип: владелец ресурса берётся из проверенного токена, а не из параметров запроса.
 """
-import os
-from dataclasses import dataclass
-from typing import Optional
-
+from tips.app.auth import Principal
 from tips.domain.errors import PaymentError
 
-ROLES = ("merchant", "waiter", "admin")
-
-
-class Unauthenticated(Exception):
-    """Нет действительных учётных данных: HTTP 401."""
-
-
-@dataclass(frozen=True)
-class Principal:
-    role: str
-    merchant_id: Optional[str] = None
-    employee_id: Optional[str] = None
-
-
-def authenticate(headers):
-    if os.environ.get("TIPS_DEV_AUTH") != "1":
-        raise Unauthenticated()
-    role = headers.get("x-dev-role")
-    if role not in ROLES:
-        raise Unauthenticated()
-    return Principal(role, headers.get("x-dev-merchant"), headers.get("x-dev-employee"))
+__all__ = ["Principal", "authorize_issue_qr", "authorize_report", "authorize_admin"]
 
 
 def authorize_issue_qr(principal, merchant_id, employee_id):

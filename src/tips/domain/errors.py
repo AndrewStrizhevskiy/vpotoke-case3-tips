@@ -13,11 +13,20 @@ ERRORS = {
     "TIP_OUT_OF_RANGE": (422, True, "Чаевые — не больше 50 % от чека"),
     "IDEMPOTENCY_CONFLICT": (409, False, "Обновите страницу"),
     "PAYMENT_IN_PROGRESS": (409, True, "Оплата уже обрабатывается"),
+    "RATE_LIMITED": (429, True, "Слишком много запросов, повторите чуть позже"),
     "CANCEL_NOT_ALLOWED": (409, False, "Отмена невозможна: оплата уже отправлена в банк или закрыта"),
     "PAYMENT_STATE_CONFLICT": (409, False, "Оплата была отменена"),
     "NOT_FOUND": (404, False, "Не удалось открыть оплату"),
     "ACCESS_DENIED": (403, False, "Нет доступа"),
 }  # код -> (HTTP-аналог, retryable, текст для клиента); совпадает с docs/adr-006 и api/05_api_schemas.yaml
+
+
+class RateLimited(Exception):
+    """Сервис перегружен или лимит исчерпан: HTTP 429 с Retry-After."""
+
+
+class Unauthenticated(Exception):
+    """Нет действительных учётных данных (неверный пароль, токен, срок, отзыв): HTTP 401, без подробностей."""
 
 
 class StateChanged(Exception):

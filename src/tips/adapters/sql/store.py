@@ -187,6 +187,117 @@ class SqlStore:
                       m=merchant_id, old=old, new=new_status, reason=reason, actor=actor, at=now.strftime(TIME_FMT))
             return old
 
+    # ---- пользователи, токены обновления, журнал входа ----
+
+    USER_COLS = ("user_id, login, password_hash, role, merchant_id, employee_id, status, failed_attempts, "
+                 + TS.format(col="locked_until") + " AS locked_until, "
+                 + TS.format(col="password_changed_at") + " AS password_changed_at")
+
+    def create_user(self, user, now):
+        stamp = now.strftime(TIME_FMT)
+        try:
+            with self.atomic():
+                self._run(
+                    "INSERT INTO users (user_id, login, password_hash, role, merchant_id, employee_id, created_at, "
+                    "password_changed_at) VALUES (:id, :login, :hash, :role, :m, :e, CAST(:at AS timestamptz), "
+                    "CAST(:at AS timestamptz))",
+                    id=user["user_id"], login=user["login"], hash=user["password_hash"], role=user["role"],
+                    m=user.get("merchant_id"), e=user.get("employee_id"), at=stamp)
+                self.auth_event(user["user_id"], "user_created", now)
+        except IntegrityError as exc:
+            constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", "") or "ограничение"
+            raise ValueError(f"пользователь не создан: нарушено {constraint} "
+                             "(логин занят или у официанта уже есть учётная запись)") from exc
+
+    def user_by_login(self, login):
+        return self._one(f"SELECT {self.USER_COLS} FROM users WHERE login = :login", login=login)
+
+    def user_by_id(self, user_id):
+        return self._one(f"SELECT {self.USER_COLS} FROM users WHERE user_id = :id", id=user_id)
+
+    def lock_user(self, user_id):
+        """Строка пользователя под блокировкой до конца транзакции. Порядок блокировок везде один: пользователь, затем
+        его токены (иначе смена пароля и обновление токена могли бы взаимно заблокироваться)."""
+        return self._one(f"SELECT {self.USER_COLS} FROM users WHERE user_id = :id FOR UPDATE", id=user_id)
+
+    def count_active_admins(self):
+        self._run("SELECT pg_advisory_xact_lock(7283001)")  # закрытия администраторов идут по одному
+        return self._one("SELECT count(*) AS n FROM users WHERE role = 'admin' AND status = 'ACTIVE'")["n"]
+
+    def record_login_failure(self, user_id, now, max_failures, lock_seconds):
+        """Счётчик растёт атомарно и затухает: неудача старше окна блокировки начинает отсчёт заново.
+        На пороге учётная запись блокируется, и счётчик обнуляется."""
+        with self.atomic():
+            row = self._one(
+                "UPDATE users SET failed_attempts = CASE WHEN last_failed_at IS NOT NULL AND last_failed_at > "
+                "CAST(:now AS timestamptz) - make_interval(secs => :secs) THEN failed_attempts + 1 ELSE 1 END, "
+                "last_failed_at = CAST(:now AS timestamptz) WHERE user_id = :id RETURNING failed_attempts",
+                id=user_id, now=now.strftime(TIME_FMT), secs=lock_seconds)
+            locked = bool(row) and row["failed_attempts"] >= max_failures
+            if locked:
+                self._run("UPDATE users SET failed_attempts = 0, "
+                          "locked_until = CAST(:now AS timestamptz) + make_interval(secs => :secs) WHERE user_id = :id",
+                          id=user_id, now=now.strftime(TIME_FMT), secs=lock_seconds)
+            self.auth_event(user_id, "login_locked" if locked else "login_failed", now)
+            return locked
+
+    def record_login_success(self, user_id, now):
+        with self.atomic():
+            self._run("UPDATE users SET failed_attempts = 0, last_failed_at = NULL, locked_until = NULL "
+                      "WHERE user_id = :id", id=user_id)
+            self.auth_event(user_id, "login_ok", now)
+
+    def set_password_hash(self, user_id, password_hash, now, audit=True):
+        with self.atomic():
+            self._run("UPDATE users SET password_hash = :h WHERE user_id = :id", h=password_hash, id=user_id)
+            if audit:  # смена пароля, а не обновление параметров хеша при входе
+                self._run("UPDATE users SET password_changed_at = CAST(:at AS timestamptz), failed_attempts = 0, "
+                          "last_failed_at = NULL, locked_until = NULL WHERE user_id = :id",
+                          at=now.strftime(TIME_FMT), id=user_id)
+                self.auth_event(user_id, "password_changed", now)
+
+    def set_user_status(self, user_id, status, now):
+        with self.atomic():
+            self._run("UPDATE users SET status = :s WHERE user_id = :id", s=status, id=user_id)
+            self.auth_event(user_id, "user_disabled" if status == "DISABLED" else "user_enabled", now)
+
+    def insert_refresh_token(self, user_id, family_id, token_hash, now, expires_at, family_started_at):
+        self._run(
+            "INSERT INTO refresh_tokens (user_id, family_id, token_hash, issued_at, expires_at, family_started_at) "
+            "VALUES (:u, CAST(:f AS uuid), :h, CAST(:now AS timestamptz), CAST(:exp AS timestamptz), "
+            "CAST(:started AS timestamptz))",
+            u=user_id, f=family_id, h=token_hash, now=now.strftime(TIME_FMT), exp=expires_at.strftime(TIME_FMT),
+            started=family_started_at.strftime(TIME_FMT))
+
+    def refresh_token_owner(self, token_hash):
+        """Чей токен, без блокировки: нужно, чтобы сначала заблокировать пользователя, потом токен."""
+        row = self._one("SELECT user_id FROM refresh_tokens WHERE token_hash = :h", h=token_hash)
+        return row["user_id"] if row else None
+
+    def refresh_token_for_update(self, token_hash):
+        return self._one(
+            "SELECT token_id, user_id, family_id::text AS family_id, " + TS.format(col="expires_at") + " AS expires_at, "
+            + TS.format(col="family_started_at") + " AS family_started_at, "
+            "rotated_at IS NOT NULL AS rotated, revoked_at IS NOT NULL AS revoked, "
+            + TS.format(col="rotated_at") + " AS rotated_at "
+            "FROM refresh_tokens WHERE token_hash = :h FOR UPDATE", h=token_hash)
+
+    def mark_refresh_rotated(self, token_id, now):
+        self._run("UPDATE refresh_tokens SET rotated_at = CAST(:now AS timestamptz) WHERE token_id = :id",
+                  id=token_id, now=now.strftime(TIME_FMT))
+
+    def revoke_family(self, family_id, now):
+        self._run("UPDATE refresh_tokens SET revoked_at = CAST(:now AS timestamptz) "
+                  "WHERE family_id = CAST(:f AS uuid) AND revoked_at IS NULL", f=family_id, now=now.strftime(TIME_FMT))
+
+    def revoke_user_tokens(self, user_id, now):
+        self._run("UPDATE refresh_tokens SET revoked_at = CAST(:now AS timestamptz) "
+                  "WHERE user_id = :u AND revoked_at IS NULL", u=user_id, now=now.strftime(TIME_FMT))
+
+    def auth_event(self, user_id, action, now):
+        self._run("INSERT INTO auth_events (user_id, action, at) VALUES (:u, :a, CAST(:at AS timestamptz))",
+                  u=user_id, a=action, at=now.strftime(TIME_FMT))
+
     # ---- QR и чеки, выпущенные платформой ----
 
     def add_receipt(self, merchant_id, receipt_id, amount):

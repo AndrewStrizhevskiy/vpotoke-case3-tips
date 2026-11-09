@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install checkers
-        run: pip install pyyaml jsonschema openapi-spec-validator ruff "sqlalchemy>=2.0" "psycopg[binary]" alembic fastapi uvicorn httpx
+        run: pip install pyyaml jsonschema openapi-spec-validator ruff "sqlalchemy>=2.0" "psycopg[binary]" alembic fastapi uvicorn httpx "PyJWT[crypto]" argon2-cffi
       - name: Lint
         run: ruff check src tests migrations prototype/04_прототип.py
       - name: Unit tests (domain, PostgreSQL races and constraints)

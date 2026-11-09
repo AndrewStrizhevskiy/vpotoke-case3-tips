@@ -11,6 +11,8 @@
 #   - TipCreate: обязательное поле sig (подпись из ссылки QR). Без неё перебор qr_id (они идут подряд)
 #     позволил бы создавать платежи по чужим чекам; сервер проверяет её первой (Q-1, ADR-003/004).
 #   - Защищённые операции отвечают 401, если нет действительных учётных данных (403 — если права не те).
+#   - Вход: POST /api/v1/auth/login, /auth/refresh, /auth/logout. Access-токен JWT (ES256, 15 минут), refresh-токен
+#     непрозрачный, при каждом обновлении заменяется новым; повторное предъявление использованного отзывает цепочку.
 #   - /reports/tips: ровно один из merchant_id или employee_id (отчёт по официанту из 09_reports).
 #   - Добавлены POST /api/v1/qr, GET /api/v1/payments/{id}, /reports/tips/daily,
 #     PATCH /api/v1/merchants/{id}/status — без них не закрываются FR и RBAC.
@@ -30,6 +32,7 @@ tags:
   - name: payments
   - name: reports
   - name: admin
+  - name: auth
 
 # ---------- ОБРАЗЕЦ ----------
 components:
@@ -174,6 +177,28 @@ components:
         confirm_token: 9b7e2c41d0a84f3e8a6b5c2d1e0f9a8b
         error_code: null
         created_at: "2025-11-01T18:00:00Z"
+
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login: {type: string, minLength: 1, maxLength: 100}
+        password: {type: string, minLength: 1, maxLength: 256, format: password}
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: {type: string, minLength: 16, maxLength: 200}
+
+    TokenPair:
+      type: object
+      required: [access_token, refresh_token, token_type, expires_in]
+      properties:
+        access_token: {type: string, description: "JWT ES256; роль и привязка к заведению зашиты в claims"}
+        refresh_token: {type: string, description: "Показывается один раз; в базе только хеш"}
+        token_type: {type: string, enum: [Bearer]}
+        expires_in: {type: integer, description: "Секунды жизни access-токена", example: 900}
 
     MerchantStatusUpdate:
       type: object
@@ -329,6 +354,54 @@ paths:
               schema: {type: object, properties: {status: {type: string}}}
 
   # ---------- ЗАПОЛНЕНО ----------
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Вход по логину и паролю
+      description: >
+        Неверный пароль, неизвестный логин, закрытая или временно заблокированная учётная запись (5 неудач подряд
+        блокируют вход на 15 минут) дают один и тот же ответ 401.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/LoginRequest'}}}
+      responses:
+        '200':
+          description: Пара токенов
+          content: {application/json: {schema: {$ref: '#/components/schemas/TokenPair'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Обменять refresh-токен на новую пару
+      description: >
+        Старый refresh-токен перестаёт действовать. Если предъявлен уже использованный токен (признак кражи),
+        вся цепочка токенов этого входа отзывается, и нужен новый вход.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/RefreshRequest'}}}
+      responses:
+        '200':
+          description: Новая пара токенов
+          content: {application/json: {schema: {$ref: '#/components/schemas/TokenPair'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      summary: "Выйти (отозвать цепочку refresh-токенов)"
+      description: Ответ всегда 204, чтобы нельзя было проверять чужие токены.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/RefreshRequest'}}}
+      responses:
+        '204': {description: Цепочка отозвана}
+        '400': {$ref: '#/components/responses/BadRequest'}
+
   /api/v1/qr:
     post:
       tags: [qr]

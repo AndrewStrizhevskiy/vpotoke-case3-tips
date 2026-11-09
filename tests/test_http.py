@@ -1,161 +1,30 @@
-"""HTTP API: сценарии T3 через клиент FastAPI, права доступа, токен платежа, гонки и соответствие контракту.
+"""HTTP API: сценарии T3 через клиент FastAPI, токен платежа, форма чаевых, гонки и соответствие контракту.
 
     TIPS_HMAC_SECRET=<демо-ключ> python3 -m unittest tests.test_http
 
 Каждый ответ проверяется по api/05_api_schemas.yaml: тело проходит схему, а код описан для этой операции.
 Нужны fastapi, httpx, sqlalchemy, psycopg, pyyaml, jsonschema и PostgreSQL (см. test_postgres.py).
+Права по ролям, JWT и вход проверяются в test_auth.py.
 """
 import os
 import sys
 import threading
 import unittest
 import uuid
-from datetime import datetime, timezone
-from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "src"))
-sys.path.insert(0, os.path.join(HERE, "..", "prototype"))
 sys.path.insert(0, HERE)
 
-try:
-    import jsonschema  # noqa: F401
-    import psycopg  # noqa: F401
-    import sqlalchemy  # noqa: F401
-    import yaml  # noqa: F401
-    from fastapi.testclient import TestClient
-    HAVE_DEPS = True
-except ImportError:
-    HAVE_DEPS = False
+from http_support import HAVE_DEPS, LATER, SECRET, TEST_QR, HttpTestBase  # noqa: E402
 
 if HAVE_DEPS:
-    from sqlalchemy import text
+    from fastapi.testclient import TestClient
 
-    import contract_check
-    from support import database_url
-    from tips.adapters.gateway.emulator import EmulatorGateway
-    from tips.adapters.sql.admin import bootstrap, drop_schema
     from tips.adapters.sql.seed import add_extra_qrs
-    from tips.adapters.sql.store import SqlStore
-    from tips.http.app import create_app
-
-SECRET = os.environ.get("TIPS_HMAC_SECRET", "")
-NOW = datetime(2025, 11, 1, 18, 0, 0, tzinfo=timezone.utc)
-LATER = datetime(2025, 11, 2, 0, 0, 0, tzinfo=timezone.utc)  # QR из seed уже истекли
-TEST_QR = os.path.join(HERE, "..", "prototype", "test_qr_links.csv")
-PATH_TEMPLATES = {  # путь запроса -> шаблон из контракта
-    "/api/v1/qr/": "/api/v1/qr/{qr_id}", "/api/v1/tips": "/api/v1/tips", "/api/v1/qr": "/api/v1/qr",
-    "/health": "/health", "/api/v1/reports/tips/daily": "/api/v1/reports/tips/daily",
-    "/api/v1/reports/tips": "/api/v1/reports/tips",
-}
-
-
-def template(path):
-    if path.startswith("/api/v1/payments/"):
-        return "/api/v1/payments/{id}/" + path.rsplit("/", 1)[1] if path.count("/") == 5 else "/api/v1/payments/{id}"
-    if path.startswith("/api/v1/merchants/"):
-        return "/api/v1/merchants/{merchant_id}/status"
-    if path.startswith("/api/v1/qr/"):
-        return "/api/v1/qr/{qr_id}"
-    return PATH_TEMPLATES[path]
-
-
-class SlowGateway:
-    def __init__(self, delay=0.15):
-        self.inner = EmulatorGateway()
-        self.delay = delay
-        self.calls = 0
-        self._lock = threading.Lock()
-
-    def charge(self, qr_id, nonce):
-        import time
-        with self._lock:
-            self.calls += 1
-        time.sleep(self.delay)
-        return self.inner.charge(qr_id, nonce)
 
 
 @unittest.skipUnless(HAVE_DEPS and SECRET, "нужны fastapi, httpx, sqlalchemy, psycopg, pyyaml, jsonschema и TIPS_HMAC_SECRET")
-class HttpTests(unittest.TestCase):
-    def setUp(self):
-        self.url = database_url()
-        if not self.url:
-            self.skipTest("нет PostgreSQL")
-        self.schema = "th_" + uuid.uuid4().hex[:12]
-        self.engine = bootstrap(self.url, self.schema)
-        self.gateway = SlowGateway(delay=0)
-        self.now = NOW
-        self.app = create_app(self.engine, self.gateway, SECRET, lambda: self.now)
-        self.client = TestClient(self.app)
-        self.contract = contract_check.Contract()
-        self.addCleanup(self._drop)
-        self.store = SqlStore(self.engine)
-
-    def _drop(self):
-        self.client.close()
-        self.engine.dispose()
-        drop_schema(self.url, self.schema)
-        self.assertEqual(self.contract.failures, [], "ответы разошлись с контрактом")
-
-    # ---- помощники ----
-
-    def call(self, method, path, schema=None, client=None, **kwargs):
-        """Запрос с проверкой по контракту: код описан для операции, тело проходит схему."""
-        response = (client or self.client).request(method, path, **kwargs)
-        op = template(path.split("?")[0])
-        self.contract.checked += 1
-        if response.status_code not in self.contract.documented(op, method.lower()):
-            self.contract.failures.append(f"{method} {op}: код {response.status_code} не описан")
-        if response.headers.get("content-type", "").startswith("application/json"):
-            body = response.json()
-            if "payment_id" in body:
-                name = "Payment"
-            elif response.status_code >= 400:
-                name = "Error"
-            else:
-                name = schema
-            if name:
-                self.contract.check(f"{method} {op} -> {response.status_code}", name, body)
-        return response
-
-    def qr(self, qr_id):
-        row = self.store.find_qr(qr_id)
-        return row["signature"], row["receipt_id"], float(self.store.receipt_amount(row["merchant_id"], row["receipt_id"]))
-
-    def tip_body(self, qr_id="qr_001", key=None, **extra):
-        sig, receipt, amount = self.qr(qr_id)
-        body = {"qr_id": qr_id, "sig": sig, "receipt_id": receipt, "base_amount": amount, "tip_pct": 5,
-                "idempotency_key": key or str(uuid.uuid4())}
-        body.update(extra)
-        return body
-
-    def tip(self, qr_id="qr_001", client=None, **extra):
-        return self.call("POST", "/api/v1/tips", client=client, json=self.tip_body(qr_id, **extra))
-
-    def confirm(self, payment, client=None):
-        return self.call("POST", f"/api/v1/payments/{payment['payment_id']}/confirm", client=client,
-                         json={"confirm_token": payment["confirm_token"]})
-
-    def cancel(self, payment):
-        return self.call("POST", f"/api/v1/payments/{payment['payment_id']}/cancel",
-                         json={"confirm_token": payment["confirm_token"]})
-
-    def status(self, payment, token=None):
-        return self.call("GET", f"/api/v1/payments/{payment['payment_id']}",
-                         headers={"X-Payment-Token": token or payment["confirm_token"]})
-
-    def count(self, sql, **params):
-        with self.engine.connect() as c:
-            return c.execute(text(sql), params).scalar()
-
-    def as_user(self, role, merchant=None, employee=None):
-        headers = {"X-Dev-Role": role}
-        if merchant:
-            headers["X-Dev-Merchant"] = merchant
-        if employee:
-            headers["X-Dev-Employee"] = employee
-        return headers
-
+class HttpTests(HttpTestBase):
     # ---- сценарии T3 ----
 
     def test_health(self):
@@ -368,15 +237,12 @@ class HttpTests(unittest.TestCase):
                  ("GET", "/api/v1/reports/tips?merchant_id=m_001&from=2025-11-01&to=2025-11-30", {}),
                  ("GET", "/api/v1/reports/tips/daily?merchant_id=m_001&from=2025-11-01&to=2025-11-30", {}),
                  ("PATCH", "/api/v1/merchants/m_001/status", {"json": {"status": "BLOCKED", "reason": "тест"}})]
-        for method, path, kwargs in calls:  # без TIPS_DEV_AUTH (по умолчанию) и без JWT: 401
-            response = self.call(method, path, **kwargs)
-            self.assertEqual((response.status_code, response.json()["error_code"]), (401, "ACCESS_DENIED"), path)
-            self.assertEqual(response.headers["www-authenticate"], "Bearer")
-        with mock.patch.dict(os.environ, {"TIPS_DEV_AUTH": "1"}):  # включена, но заголовков роли нет
-            self.assertEqual(self.call("GET", "/api/v1/reports/tips?merchant_id=m_001&from=2025-11-01&to=2025-11-30").status_code,
-                             401)
+        for headers in ({}, {"Authorization": "Bearer not-a-jwt"}, {"Authorization": "Basic YWRtaW46YWRtaW4="}):
+            for method, path, kwargs in calls:
+                response = self.call(method, path, headers=headers, **kwargs)
+                self.assertEqual((response.status_code, response.json()["error_code"]), (401, "ACCESS_DENIED"), path)
+                self.assertEqual(response.headers["www-authenticate"], "Bearer")
 
-    @mock.patch.dict(os.environ, {"TIPS_DEV_AUTH": "1"})
     def test_issue_qr_rules(self):
         body = {"merchant_id": "m_001", "employee_id": "e_001", "receipt_id": "r_1001"}
         own = self.call("POST", "/api/v1/qr", "QRCreated", json=body, headers=self.as_user("waiter", "m_001", "e_001"))
@@ -395,7 +261,6 @@ class HttpTests(unittest.TestCase):
         stranger = self.call("POST", "/api/v1/qr", json=dict(body, employee_id="e_004"), headers=merchant)
         self.assertEqual((stranger.status_code, stranger.json()["error_code"]), (403, "ACCESS_DENIED"))  # чужой официант
 
-    @mock.patch.dict(os.environ, {"TIPS_DEV_AUTH": "1"})
     def test_reports_and_their_access(self):
         query = "from=2025-11-01&to=2025-11-30"
         merchant = self.as_user("merchant", "m_001")
@@ -426,7 +291,6 @@ class HttpTests(unittest.TestCase):
         missing = self.call("GET", f"/api/v1/reports/tips?merchant_id=m_777&{query}", headers=self.as_user("admin"))
         self.assertEqual(missing.status_code, 404)
 
-    @mock.patch.dict(os.environ, {"TIPS_DEV_AUTH": "1"})
     def test_admin_blocks_merchant_and_event_is_logged(self):
         sig, _, _ = self.qr("qr_001")
         self.assertEqual(self.call("GET", f"/api/v1/qr/qr_001?sig={sig}").status_code, 200)
@@ -442,7 +306,6 @@ class HttpTests(unittest.TestCase):
                   headers=self.as_user("admin"))
         self.assertEqual(self.call("GET", f"/api/v1/qr/qr_001?sig={sig}").status_code, 200)
 
-    @mock.patch.dict(os.environ, {"TIPS_DEV_AUTH": "1"})
     def test_merchant_status_rules(self):
         body = {"status": "BLOCKED", "reason": "тест"}
         for who in (self.as_user("merchant", "m_001"), self.as_user("waiter", "m_001", "e_001")):

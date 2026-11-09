@@ -128,7 +128,7 @@ class ReportTests(unittest.TestCase):
 class ErrorCatalogTests(unittest.TestCase):
     def test_every_error_has_http_retryable_and_text(self):
         for code, (http, retryable, message) in ERRORS.items():
-            self.assertIn(http, (400, 403, 404, 409, 410, 422), code)
+            self.assertIn(http, (400, 403, 404, 409, 410, 422, 429), code)
             self.assertIsInstance(retryable, bool, code)
             self.assertTrue(message, code)
 

@@ -12,19 +12,22 @@ from typing import Optional
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from tips.adapters.gateway.emulator import EmulatorGateway
+from tips.adapters.jwt_keys import Keyring
+from tips.adapters.passwords import Passwords
 from tips.adapters.sql.engine import make_engine
 from tips.adapters.sql.store import SqlStore
+from tips.app import auth as auth_service
 from tips.app.payments import cancel_payment, confirm_payment, create_payment
 from tips.app.qr import create_qr, get_qr_view
 from tips.app.reports import build_report
 from tips.app.tokens import hash_token, new_token, token_matches
 from tips.config import get_secret
-from tips.domain.errors import PaymentError
+from tips.domain.errors import PaymentError, RateLimited, Unauthenticated
 from tips.http import auth
 from tips.http.errors import error_body, http_error_handler, payment_error_handler, validation_error_handler
 from tips.http.serialize import payment_json, qr_view_json
@@ -35,6 +38,7 @@ MERCHANT_ID = re.compile(r"^m_[0-9]{3}$")
 EMPLOYEE_ID = re.compile(r"^e_[0-9]{3}$")
 SIG = re.compile(r"^[a-f0-9]{16}$")
 STATUS_BY_PAYMENT = {"SUCCESS": 200, "PENDING": 202, "DECLINED": 402}
+NO_STORE = {"Cache-Control": "no-store", "Pragma": "no-cache"}  # токены не кладут в кэш
 
 
 def utc_now():
@@ -57,29 +61,41 @@ def matches(pattern, value):
     return isinstance(value, str) and pattern.match(value) is not None
 
 
-def create_app(engine=None, gateway=None, secret=None, clock=None):
-    """Собрать приложение. Параметры нужны тестам: свой движок, шлюз, ключ и часы (QR из seed истекли в 2025 году)."""
+def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None, passwords=None):
+    """Собрать приложение. Параметры нужны тестам: свой движок, шлюз, ключи и часы (QR из seed истекли в 2025 году)."""
     app = FastAPI(title="Tips Platform", version="1.0.0", description="Онлайн-чаевые для сети «Вкус-Сервис»")
     app.state.engine = engine or make_engine()
     app.state.gateway = gateway or EmulatorGateway()
     key = secret if secret is not None else get_secret()
     app.state.secret = key.encode() if isinstance(key, str) else key
     app.state.clock = clock or utc_now
+    app.state.keyring = keyring or Keyring.from_env()
+    app.state.passwords = passwords or Passwords()
 
     app.add_exception_handler(PaymentError, payment_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
 
-    @app.exception_handler(auth.Unauthenticated)
+    @app.exception_handler(RateLimited)
+    async def rate_limited(_request, _exc):
+        _, body = error_body("RATE_LIMITED")
+        return JSONResponse(body, status_code=429, headers={"Retry-After": "1", **NO_STORE})
+
+    @app.exception_handler(Unauthenticated)
     async def unauthenticated(_request, _exc):
         _, body = error_body("ACCESS_DENIED")
-        return JSONResponse(body, status_code=401, headers={"WWW-Authenticate": "Bearer"})
+        return JSONResponse(body, status_code=401, headers={"WWW-Authenticate": "Bearer", **NO_STORE})
 
     def store():
         return SqlStore(app.state.engine)
 
-    def principal(request):
-        return auth.authenticate(request.headers)
+    async def principal(request):
+        """Кто вызывает: проверенный JWT и действующий пользователь в базе. Иначе 401."""
+        scheme, _, token = request.headers.get("authorization", "").partition(" ")
+        if scheme.lower() != "bearer" or not token.strip():
+            raise Unauthenticated()
+        return await run_in_threadpool(
+            lambda: auth_service.authenticate(store(), app.state.keyring, token.strip(), app.state.clock()))
 
     def owned_payment(payment_id, token):
         """Платёж по id и токену. Чужой токен и несуществующий id дают один и тот же NOT_FOUND."""
@@ -166,11 +182,41 @@ def create_app(engine=None, gateway=None, secret=None, clock=None):
 
         return payment_json(await run_in_threadpool(work))
 
+    # ---------- вход ----------
+
+    async def body_object(request):
+        body = await read_json(request)
+        if not isinstance(body, dict):
+            raise invalid()
+        return body
+
+    @app.post("/api/v1/auth/login")
+    async def login(request: Request):
+        body = await body_object(request)
+        pair = await run_in_threadpool(lambda: auth_service.login(
+            store(), app.state.keyring, app.state.passwords, body.get("login"), body.get("password"), app.state.clock()))
+        return JSONResponse(pair, headers=NO_STORE)
+
+    @app.post("/api/v1/auth/refresh")
+    async def refresh(request: Request):
+        body = await body_object(request)
+        pair = await run_in_threadpool(lambda: auth_service.refresh(
+            store(), app.state.keyring, body.get("refresh_token"), app.state.clock()))
+        return JSONResponse(pair, headers=NO_STORE)
+
+    @app.post("/api/v1/auth/logout")
+    async def logout(request: Request):
+        body = await body_object(request)
+        if not isinstance(body.get("refresh_token"), str):
+            raise invalid()
+        await run_in_threadpool(lambda: auth_service.logout(store(), body["refresh_token"], app.state.clock()))
+        return Response(status_code=204, headers=NO_STORE)
+
     # ---------- мерчант, официант, администратор ----------
 
     @app.post("/api/v1/qr", status_code=201)
     async def issue_qr(request: Request):
-        who = principal(request)
+        who = await principal(request)
         req = await read_json(request)
         if not isinstance(req, dict) or "amount" in req:  # сумма чека берётся из реестра кассы, а не из запроса
             raise invalid()
@@ -189,7 +235,7 @@ def create_app(engine=None, gateway=None, secret=None, clock=None):
 
     @app.get("/api/v1/reports/tips")
     async def tips_report(request: Request, merchant_id: Optional[str] = None, employee_id: Optional[str] = None):
-        who = principal(request)
+        who = await principal(request)
         check_ids(merchant_id, employee_id)
         if (merchant_id is None) == (employee_id is None):  # ровно один из двух
             raise invalid()
@@ -199,7 +245,7 @@ def create_app(engine=None, gateway=None, secret=None, clock=None):
 
     @app.get("/api/v1/reports/tips/daily")
     async def tips_daily(request: Request, merchant_id: Optional[str] = None):
-        who = principal(request)
+        who = await principal(request)
         check_ids(merchant_id, None)
         if merchant_id is None:
             raise invalid()
@@ -209,7 +255,7 @@ def create_app(engine=None, gateway=None, secret=None, clock=None):
 
     @app.patch("/api/v1/merchants/{merchant_id}/status")
     async def merchant_status(merchant_id: str, request: Request):
-        who = principal(request)
+        who = await principal(request)
         auth.authorize_admin(who)
         if not matches(MERCHANT_ID, merchant_id):
             raise invalid()
@@ -219,7 +265,7 @@ def create_app(engine=None, gateway=None, secret=None, clock=None):
         if status not in ("ACTIVE", "BLOCKED") or not isinstance(reason, str) or not 1 <= len(reason) <= 200:
             raise invalid()
         old = await run_in_threadpool(
-            lambda: store().set_merchant_status(merchant_id, status, reason, f"admin:{who.role}", app.state.clock()))
+            lambda: store().set_merchant_status(merchant_id, status, reason, f"admin:{who.user_id}", app.state.clock()))
         if old is None:
             raise PaymentError("NOT_FOUND")
         return {"merchant_id": merchant_id, "status": status}
