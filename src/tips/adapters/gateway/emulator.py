@@ -31,3 +31,18 @@ class EmulatorGateway:
 
     def charge(self, qr_id, nonce):
         return emulate_gateway(qr_id, nonce, load_scenarios(self.scenarios_csv))
+
+    def lookup(self, qr_id, nonce):
+        """Статус платежа у шлюза (для сверки): SUCCESS, DECLINED, PENDING или NOT_FOUND.
+
+        Исход эмулятора детерминирован. «Таймаут» эмулятора означает, что банк запрос не получил, поэтому
+        шлюз о платеже ничего не знает (NOT_FOUND) и списания не было. Платёж, застрявший после сбоя между
+        переходом в PENDING и записью ответа, получит здесь свой настоящий исход."""
+        result, error = emulate_gateway(qr_id, nonce, load_scenarios(self.scenarios_csv))
+        if result == "PENDING":
+            return "NOT_FOUND", error
+        return result, error
+
+    def void(self, qr_id, nonce):
+        """Отмена до списания: у эмулятора списаний нет, отменять нечего, отмена всегда удаётся."""
+        return True

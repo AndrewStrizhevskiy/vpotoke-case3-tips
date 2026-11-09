@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from tips.domain.errors import ERRORS, PaymentError  # noqa: E402
 from tips.domain.money import calc_amounts, fmt, to_money  # noqa: E402
-from tips.domain.qr_sign import check_exp, compute_signature, parse_time, verify_signature  # noqa: E402
+from tips.domain.qr_sign import QrKeys, check_exp, compute_signature, parse_time, verify_signature  # noqa: E402
 from tips.domain.reports import report_metrics  # noqa: E402
 from tips.domain.validation import parse_day, validate_qr_request, validate_request  # noqa: E402
 
@@ -66,6 +66,41 @@ class SignatureTests(unittest.TestCase):
         exp = parse_time(QR["exp"])
         self.assertTrue(check_exp(QR, exp))
         self.assertFalse(check_exp(QR, exp.replace(second=1)))
+
+
+class KeyRotationTests(unittest.TestCase):
+    OLD, NEW = b"old-key-for-rotation-test", b"new-key-for-rotation-test"
+
+    def signed(self, key):
+        return dict(QR, signature=compute_signature(key, QR))
+
+    def test_active_key_signs_and_retired_key_still_verifies(self):
+        old_qr = self.signed(self.OLD)
+        rotated = QrKeys(self.NEW, [self.OLD])
+        self.assertTrue(verify_signature(rotated, old_qr, old_qr["signature"]))  # QR, выпущенный до ротации, живёт
+        new_qr = dict(QR, signature=compute_signature(rotated, QR))
+        self.assertEqual(new_qr["signature"], self.signed(self.NEW)["signature"])  # новые подписываются активным
+        self.assertTrue(verify_signature(rotated, new_qr, new_qr["signature"]))
+
+    def test_dropped_key_no_longer_verifies(self):
+        old_qr = self.signed(self.OLD)
+        self.assertFalse(verify_signature(QrKeys(self.NEW), old_qr, old_qr["signature"]))
+        self.assertFalse(verify_signature(QrKeys(self.NEW, [b"unrelated"]), old_qr, old_qr["signature"]))
+
+    def test_link_signature_must_still_match(self):
+        qr = self.signed(self.OLD)
+        keys = QrKeys(self.NEW, [self.OLD])
+        self.assertFalse(verify_signature(keys, qr, "0" * 16))
+        self.assertFalse(verify_signature(keys, dict(qr, receipt_id="r_1002"), qr["signature"]))
+
+    def test_non_ascii_signature_is_just_invalid(self):
+        qr = self.signed(self.OLD)
+        for sig in ("ééééééééééééééé", "⁶" * 16, "a" * 15 + "я", 12345, None, b"bytes"):
+            self.assertFalse(verify_signature(self.OLD, qr, sig), repr(sig))  # раньше TypeError, то есть ответ 500
+
+    def test_plain_bytes_still_work(self):
+        qr = self.signed(self.OLD)
+        self.assertTrue(verify_signature(self.OLD, qr, qr["signature"]))
 
 
 class ValidationTests(unittest.TestCase):
@@ -128,7 +163,7 @@ class ReportTests(unittest.TestCase):
 class ErrorCatalogTests(unittest.TestCase):
     def test_every_error_has_http_retryable_and_text(self):
         for code, (http, retryable, message) in ERRORS.items():
-            self.assertIn(http, (400, 403, 404, 409, 410, 422, 429), code)
+            self.assertIn(http, (400, 403, 404, 409, 410, 422, 429, 500), code)
             self.assertIsInstance(retryable, bool, code)
             self.assertTrue(message, code)
 

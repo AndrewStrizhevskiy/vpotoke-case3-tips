@@ -14,6 +14,7 @@ ERRORS = {
     "IDEMPOTENCY_CONFLICT": (409, False, "Обновите страницу"),
     "PAYMENT_IN_PROGRESS": (409, True, "Оплата уже обрабатывается"),
     "RATE_LIMITED": (429, True, "Слишком много запросов, повторите чуть позже"),
+    "INTERNAL_ERROR": (500, True, "Внутренняя ошибка, повторите позже"),
     "CANCEL_NOT_ALLOWED": (409, False, "Отмена невозможна: оплата уже отправлена в банк или закрыта"),
     "PAYMENT_STATE_CONFLICT": (409, False, "Оплата была отменена"),
     "NOT_FOUND": (404, False, "Не удалось открыть оплату"),
@@ -22,7 +23,11 @@ ERRORS = {
 
 
 class RateLimited(Exception):
-    """Сервис перегружен или лимит исчерпан: HTTP 429 с Retry-After."""
+    """Сервис перегружен или лимит исчерпан: HTTP 429 с Retry-After (секунды до следующей попытки)."""
+
+    def __init__(self, retry_after=1):
+        super().__init__("rate limited")
+        self.retry_after = max(1, int(retry_after))
 
 
 class Unauthenticated(Exception):

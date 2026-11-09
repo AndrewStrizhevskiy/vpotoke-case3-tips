@@ -4,7 +4,7 @@ import secrets
 from tips.config import PAY_URL
 from tips.domain.errors import PaymentError
 from tips.domain.money import MAX_BASE, fmt
-from tips.domain.qr_sign import QR_TTL, TIME_FMT, check_exp, compute_signature, parse_time, verify_signature
+from tips.domain.qr_sign import QR_TTL, TIME_FMT, check_exp, compute_signature, verify_signature
 from tips.domain.validation import validate_qr_request
 
 TIP_OPTIONS = [0, 5, 10, 15, 20]  # кнопки формы; «своя сумма» вводится отдельно, лимит 50 %
@@ -34,27 +34,27 @@ def create_qr(req, secret, store, now, renderer=None, amount_required=True):
             raise PaymentError("NOT_FOUND")
     if not (0 < amount <= MAX_BASE):
         raise PaymentError("AMOUNT_OUT_OF_RANGE")
-    known = store.receipt_amount(merchant_id, receipt_id)
-    if known is not None and known != amount:
-        raise PaymentError("AMOUNT_MISMATCH")
 
-    rows = store.all_qrs()
-    for row in rows:  # на чек уже есть действующий QR — отдаём его, а не выпускаем второй
-        if row["merchant_id"] == merchant_id and row["receipt_id"] == receipt_id \
-                and parse_time(row["exp"]) >= now:
-            if row["employee_id"] != employee_id:
+    # Чек под блокировкой: два одновременных запроса на один чек (двойной клик) не выпустят два живых QR,
+    # потому что «один успешный платёж на QR» не защитит от оплаты каждого из двух QR по отдельности.
+    with store.atomic():
+        if store.receipt_amount(merchant_id, receipt_id) is None:  # касса передала новый чек
+            store.add_receipt(merchant_id, receipt_id, fmt(amount))
+        store.lock_receipt(merchant_id, receipt_id)
+        known = store.receipt_amount(merchant_id, receipt_id)  # перечитано под блокировкой
+        if known != amount:
+            raise PaymentError("AMOUNT_MISMATCH")
+        live = store.live_qr_for_receipt(merchant_id, receipt_id, now)
+        if live is not None:  # на чек уже есть действующий QR — отдаём его, а не выпускаем второй
+            if live["employee_id"] != employee_id:
                 raise PaymentError("ACCESS_DENIED")
-            return qr_result(row, new=False, renderer=renderer)
-
-    last = max((int(r["qr_id"][3:]) for r in rows), default=0)
-    qr = {"qr_id": f"qr_{last + 1:03d}", "merchant_id": merchant_id, "employee_id": employee_id,
-          "receipt_id": receipt_id, "nonce": secrets.token_hex(3),
-          "exp": (now + QR_TTL).strftime(TIME_FMT)}
-    qr["signature"] = compute_signature(secret, qr)
-    if known is None:  # касса передала новый чек
-        store.add_receipt(merchant_id, receipt_id, fmt(amount))
-    store.add_qr(qr)
-    return qr_result(qr, new=True, renderer=renderer)
+            return qr_result(live, new=False, renderer=renderer)
+        qr = {"qr_id": store.next_qr_id(), "merchant_id": merchant_id, "employee_id": employee_id,
+              "receipt_id": receipt_id, "nonce": secrets.token_hex(3),
+              "exp": (now + QR_TTL).strftime(TIME_FMT)}
+        qr["signature"] = compute_signature(secret, qr)
+        store.add_qr(qr)
+        return qr_result(qr, new=True, renderer=renderer)
 
 
 def qr_result(qr, new, renderer=None):

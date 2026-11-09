@@ -162,7 +162,7 @@ class PostgresTests(unittest.TestCase):
         confirm_payment(payment, self.store(), EmulatorGateway(), NOW)  # qr_010 -> PENDING (таймаут шлюза)
         self.assertEqual(find_payment(self.store(), payment["payment_id"])["status"], "PENDING")
         later = datetime(2025, 11, 1, 18, 15, 0, tzinfo=timezone.utc)
-        results = self.race([lambda: reconcile(self.store(), later) for _ in range(8)])
+        results = self.race([lambda: reconcile(self.store(), EmulatorGateway(), later) for _ in range(8)])
         self.assertTrue(all(isinstance(r, list) for r in results), results)
         self.assertEqual(sorted(sum(results, [])), [payment["payment_id"]])
         self.assertEqual(self.count("SELECT count(*) FROM audit_events WHERE action = 'payment_declined'"), 1)

@@ -71,7 +71,7 @@ components:
       type: object
       required: [qr_id, pay_url, exp]
       properties:
-        qr_id: {type: string, pattern: '^qr_[0-9]{3}$'}
+        qr_id: {type: string, pattern: '^qr_[0-9]{3,12}$'}
         pay_url:
           type: string
           format: uri
@@ -85,7 +85,7 @@ components:
       description: Данные для формы чаевых (экраны 1–2). Сумма берётся из реестра чеков, а не от клиента.
       required: [qr_id, merchant_id, merchant_name, employee_id, employee_name, receipt_id, base_amount, currency, tip_options, exp]
       properties:
-        qr_id: {type: string, pattern: '^qr_[0-9]{3}$'}
+        qr_id: {type: string, pattern: '^qr_[0-9]{3,12}$'}
         merchant_id: {type: string, pattern: '^m_[0-9]{3}$'}
         merchant_name: {type: string, maxLength: 100}
         employee_id: {type: string, pattern: '^e_[0-9]{3}$'}
@@ -119,7 +119,7 @@ components:
         Ровно одно из tip_pct или tip_amount. base_amount сверяется с реестром чеков
         (несовпадение — 422 AMOUNT_MISMATCH).
       properties:
-        qr_id: {type: string, pattern: '^qr_[0-9]{3}$'}
+        qr_id: {type: string, pattern: '^qr_[0-9]{3,12}$'}
         sig: {type: string, pattern: '^[a-f0-9]{16}$', description: Подпись из ссылки QR (параметр sig)}
         receipt_id: {type: string, pattern: '^r_[0-9]{4}$'}
         base_amount:
@@ -151,8 +151,8 @@ components:
       type: object
       required: [payment_id, qr_id, status, base_amount, tip_amount, amount_total, currency, created_at]
       properties:
-        payment_id: {type: string, pattern: '^p_[0-9]{4}$'}
-        qr_id: {type: string, pattern: '^qr_[0-9]{3}$'}
+        payment_id: {type: string, pattern: '^p_[0-9]{4,12}$'}
+        qr_id: {type: string, pattern: '^qr_[0-9]{3,12}$'}
         status: {$ref: '#/components/schemas/PaymentStatus'}
         base_amount: {$ref: '#/components/schemas/Money'}
         tip_amount: {$ref: '#/components/schemas/Money'}
@@ -274,7 +274,7 @@ components:
           enum: [INVALID_QR, QR_EXPIRED, QR_USED, MERCHANT_BLOCKED, RECEIPT_MISMATCH,
                  AMOUNT_MISMATCH, TIP_OUT_OF_RANGE, AMOUNT_OUT_OF_RANGE, IDEMPOTENCY_CONFLICT,
                  PAYMENT_IN_PROGRESS, CARD_DECLINED, GATEWAY_TIMEOUT, CANCEL_NOT_ALLOWED,
-                 PAYMENT_STATE_CONFLICT, NOT_FOUND, VALIDATION_ERROR, ACCESS_DENIED, RATE_LIMITED]
+                 PAYMENT_STATE_CONFLICT, NOT_FOUND, VALIDATION_ERROR, ACCESS_DENIED, RATE_LIMITED, INTERNAL_ERROR]
         message: {type: string}
         retryable: {type: boolean}
         details:
@@ -292,7 +292,7 @@ components:
       name: id
       in: path
       required: true
-      schema: {type: string, pattern: '^p_[0-9]{4}$'}
+      schema: {type: string, pattern: '^p_[0-9]{4,12}$'}
     From:
       name: from
       in: query
@@ -328,6 +328,9 @@ components:
     Unprocessable:
       description: INVALID_QR, RECEIPT_MISMATCH, AMOUNT_MISMATCH, TIP_OUT_OF_RANGE, AMOUNT_OUT_OF_RANGE
       content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    InternalError:
+      description: INTERNAL_ERROR — необработанная ошибка; подробности только в журнале сервера
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
     TooManyRequests:
       description: RATE_LIMITED
       headers:
@@ -352,6 +355,12 @@ paths:
           content:
             application/json:
               schema: {type: object, properties: {status: {type: string}}}
+        '503':
+          description: База недоступна
+          content:
+            application/json:
+              schema: {type: object, properties: {status: {type: string}}}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   # ---------- ЗАПОЛНЕНО ----------
   /api/v1/auth/login:
@@ -371,6 +380,7 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/auth/refresh:
     post:
@@ -389,6 +399,7 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/auth/logout:
     post:
@@ -401,6 +412,8 @@ paths:
       responses:
         '204': {description: Цепочка отозвана}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/qr:
     post:
@@ -422,6 +435,7 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/qr/{qr_id}:
     get:
@@ -429,7 +443,7 @@ paths:
       summary: Данные QR для формы чаевых (клиент, без авторизации)
       description: Порядок проверок Q-1…Q-5 — ADR-004. Неверная подпись не раскрывает, существует ли qr_id.
       parameters:
-        - {name: qr_id, in: path, required: true, schema: {type: string, pattern: '^qr_[0-9]{3}$'}}
+        - {name: qr_id, in: path, required: true, schema: {type: string, pattern: '^qr_[0-9]{3,12}$'}}
         - {name: sig, in: query, required: true, schema: {type: string, pattern: '^[a-f0-9]{16}$'}}
       responses:
         '200':
@@ -441,6 +455,7 @@ paths:
         '410': {$ref: '#/components/responses/Gone'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/tips:
     post:
@@ -464,6 +479,7 @@ paths:
         '410': {$ref: '#/components/responses/Gone'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/payments/{id}:
     get:
@@ -478,6 +494,8 @@ paths:
           content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}
         '400': {$ref: '#/components/responses/BadRequest'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/payments/{id}/confirm:
     post:
@@ -503,6 +521,8 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/payments/{id}/cancel:
     post:
@@ -521,6 +541,8 @@ paths:
         '409':
           description: CANCEL_NOT_ALLOWED — платёж в PENDING, SUCCESS или DECLINED
           content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/reports/tips:
     get:
@@ -548,6 +570,8 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/reports/tips/daily:
     get:
@@ -566,6 +590,8 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}
 
   /api/v1/merchants/{merchant_id}/status:
     patch:
@@ -583,3 +609,5 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '500': {$ref: '#/components/responses/InternalError'}

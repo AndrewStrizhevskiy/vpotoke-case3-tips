@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from tips.domain.errors import PaymentError, StateChanged
-from tips.domain.qr_sign import TIME_FMT
+from tips.domain.qr_sign import TIME_FMT, parse_time
 
 # двоеточия в формате экранированы: text() иначе принимает «:MI» за параметр запроса
 TS = 'to_char({col} AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24\\:MI\\:SS"Z"\')'
@@ -93,6 +93,14 @@ class SqlStore:
                         "WHERE merchant_id = :m AND receipt_id = :r", m=merchant_id, r=receipt_id)
         return Decimal(row["amount"]) if row else None
 
+    def live_qr_for_receipt(self, merchant_id, receipt_id, now):
+        return self._one(f"SELECT {QR_COLS} FROM qr_codes WHERE merchant_id = :m AND receipt_id = :r "
+                         "AND exp >= CAST(:now AS timestamptz) ORDER BY qr_id LIMIT 1",
+                         m=merchant_id, r=receipt_id, now=now.strftime(TIME_FMT))
+
+    def lock_receipt(self, merchant_id, receipt_id):
+        self._run("SELECT 1 FROM receipts WHERE merchant_id = :m AND receipt_id = :r FOR UPDATE", m=merchant_id, r=receipt_id)
+
     def seed_payments(self):
         return self._run("SELECT payment_id, merchant_id, employee_id, amount::text AS amount, tip::text AS tip, status, "
                          + TS.format(col="created_at") + " AS timestamp FROM seed_payments ORDER BY payment_id")
@@ -105,6 +113,21 @@ class SqlStore:
     def payments(self):
         return self._run(f"SELECT {PAYMENT_COLS} FROM payments ORDER BY payment_id")
 
+    def stale_pending(self, cutoff, limit=200):
+        return self._run(f"SELECT {PAYMENT_COLS} FROM payments WHERE status = 'PENDING' "
+                         "AND submitted_at <= CAST(:c AS timestamptz) ORDER BY submitted_at, payment_id LIMIT :n",
+                         c=cutoff.strftime(TIME_FMT), n=limit)
+
+    def pending_since(self, payment):
+        row = self._one("SELECT " + TS.format(col="submitted_at") + " AS at FROM payments WHERE payment_id = :id",
+                        id=payment["payment_id"])
+        return parse_time(row["at"])
+
+    def stale_created(self, cutoff, limit=200):
+        return self._run(f"SELECT {PAYMENT_COLS} FROM payments WHERE status = 'CREATED' "
+                         "AND created_at <= CAST(:c AS timestamptz) ORDER BY created_at, payment_id LIMIT :n",
+                         c=cutoff.strftime(TIME_FMT), n=limit)
+
     def payments_for_qr(self, qr_id):
         return self._run(f"SELECT {PAYMENT_COLS} FROM payments WHERE qr_id = :id ORDER BY payment_id", id=qr_id)
 
@@ -112,13 +135,17 @@ class SqlStore:
         return self._one(f"SELECT {PAYMENT_COLS} FROM payments WHERE payment_id = :id", id=payment_id)
 
     def audit(self):
-        return self._run(
-            "SELECT 'evt_' || lpad(event_id::text, 4, '0') AS event_id, payment_id, qr_id, action, "
+        rows = self._run(
+            "SELECT event_id AS number, payment_id, qr_id, action, "
             "coalesce(from_status, '') AS from_status, to_status, amount_total::text AS amount_total, actor, "
             + TS.format(col="at") + " AS at FROM audit_events ORDER BY event_id")
+        for row in rows:
+            row["event_id"] = f"evt_{row.pop('number'):04d}"
+        return rows
 
     def next_payment_id(self):
-        return self._one("SELECT 'p_' || lpad(nextval('payment_seq')::text, 4, '0') AS id")["id"]
+        number = self._one("SELECT nextval('payment_seq') AS n")["n"]
+        return f"p_{number:04d}"  # форматирование в Python: lpad в SQL обрезает числа длиннее ширины
 
     def _audit(self, payment, action, from_status, actor, now):
         self._run(
@@ -164,6 +191,29 @@ class SqlStore:
             payment["status"] = new_status
             payment["error_code"] = error or ""
             self._audit(payment, action, old, actor, now)
+
+    def ping(self):
+        return self._one("SELECT 1 AS ok")["ok"] == 1
+
+    # ---- лимиты запросов ----
+
+    def hit(self, bucket, window_seconds, now):
+        """Учесть запрос в текущем фиксированном окне; возвращает число запросов в нём (включая этот)."""
+        start = int(now.timestamp()) // window_seconds * window_seconds
+        row = self._one(
+            "INSERT INTO rate_hits (bucket, window_start, hits) VALUES (:b, to_timestamp(:w), 1) "
+            "ON CONFLICT (bucket, window_start) DO UPDATE SET hits = rate_hits.hits + 1 RETURNING hits",
+            b=bucket, w=start)
+        return row["hits"]
+
+    def hits(self, bucket, window_seconds, now):
+        """Сколько запросов уже учтено в текущем окне (без учёта нового)."""
+        start = int(now.timestamp()) // window_seconds * window_seconds
+        row = self._one("SELECT hits FROM rate_hits WHERE bucket = :b AND window_start = to_timestamp(:w)", b=bucket, w=start)
+        return row["hits"] if row else 0
+
+    def purge_rate_hits(self, before):
+        return self._run("DELETE FROM rate_hits WHERE window_start < CAST(:t AS timestamptz)", t=before.strftime(TIME_FMT))
 
     # ---- токен платежа и администрирование ----
 
@@ -301,8 +351,17 @@ class SqlStore:
     # ---- QR и чеки, выпущенные платформой ----
 
     def add_receipt(self, merchant_id, receipt_id, amount):
-        self._run("INSERT INTO receipts (merchant_id, receipt_id, amount, currency) VALUES (:m, :r, :a, 'RUB')",
-                  m=merchant_id, r=receipt_id, a=amount)
+        self._run("INSERT INTO receipts (merchant_id, receipt_id, amount, currency) VALUES (:m, :r, :a, 'RUB') "
+                  "ON CONFLICT DO NOTHING", m=merchant_id, r=receipt_id, a=amount)
+
+    def next_qr_id(self):
+        """Следующий номер из последовательности базы; занятые (например, заведённые вручную) пропускаются."""
+        for _ in range(100):
+            number = self._one("SELECT nextval('qr_seq') AS n")["n"]
+            qr_id = f"qr_{number:03d}"
+            if self.find_qr(qr_id) is None:
+                return qr_id
+        raise RuntimeError("не удалось подобрать свободный номер QR")
 
     def add_qr(self, qr):
         self._run(

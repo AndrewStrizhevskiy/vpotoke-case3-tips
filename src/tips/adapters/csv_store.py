@@ -5,6 +5,7 @@ from contextlib import nullcontext
 from decimal import Decimal
 
 from tips.config import DATA_DIR
+from tips.domain.qr_sign import parse_time
 
 SEED_FIELDS = ["payment_id", "merchant_id", "employee_id", "amount", "tip", "status", "timestamp"]
 OUT_FIELDS = SEED_FIELDS + ["qr_id", "idempotency_key", "amount_total", "error_code"]
@@ -127,6 +128,15 @@ class CsvStore:
     def all_qrs(self):
         return read_csv(self.qr_file) + self.qrs()
 
+    def live_qr_for_receipt(self, merchant_id, receipt_id, now):
+        for row in self.all_qrs():
+            if row["merchant_id"] == merchant_id and row["receipt_id"] == receipt_id and parse_time(row["exp"]) >= now:
+                return row
+        return None
+
+    def lock_receipt(self, merchant_id, receipt_id):
+        return None
+
     def seed_payments(self):
         return read_csv(os.path.join(self.data_dir, "payments.csv"))
 
@@ -156,6 +166,26 @@ class CsvStore:
     def lock_qr(self, qr_id):
         return None
 
+    def _submitted(self):
+        times = {}
+        for ev in self.audit():
+            if ev["action"] == "payment_submitted":
+                times[ev["payment_id"]] = parse_time(ev["at"])
+        return times
+
+    def stale_pending(self, cutoff, limit=200):
+        submitted = self._submitted()
+        rows = [p for p in self.payments()
+                if p["status"] == "PENDING" and p["payment_id"] in submitted and submitted[p["payment_id"]] <= cutoff]
+        return rows[:limit]
+
+    def pending_since(self, payment):
+        return self._submitted()[payment["payment_id"]]
+
+    def stale_created(self, cutoff, limit=200):
+        rows = [p for p in self.payments() if p["status"] == "CREATED" and parse_time(p["timestamp"]) <= cutoff]
+        return rows[:limit]
+
     def payments_for_qr(self, qr_id):
         return [p for p in self.payments() if p["qr_id"] == qr_id]
 
@@ -181,3 +211,7 @@ class CsvStore:
 
     def add_qr(self, qr):
         self.append_row(self.qr_path, QR_FIELDS, qr)
+
+    def next_qr_id(self):
+        last = max((int(r["qr_id"][3:]) for r in self.all_qrs()), default=0)
+        return f"qr_{last + 1:03d}"

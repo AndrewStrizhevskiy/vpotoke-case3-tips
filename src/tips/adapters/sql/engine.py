@@ -37,4 +37,5 @@ def make_engine(url=None, schema=None, **kwargs):
     if not SCHEMA_RE.match(schema):
         raise ValueError("недопустимое имя схемы")
     address = normalize_url(url) if url else database_url()
-    return create_engine(address, connect_args={"options": f"-c search_path={schema}"}, **kwargs)
+    # hide_parameters: в тексте ошибок базы нет значений параметров запроса (подписи, хеши, токены)
+    return create_engine(address, connect_args={"options": f"-c search_path={schema}"}, hide_parameters=True, **kwargs)

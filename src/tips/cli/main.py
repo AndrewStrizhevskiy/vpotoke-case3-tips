@@ -1,4 +1,4 @@
-"""Командная строка: pay, create, confirm, cancel, reconcile, qr, report (см. prototype/04_прототип.py)."""
+"""Командная строка: pay, create, confirm, cancel, reconcile, autocancel, qr, report (см. prototype/04_прототип.py)."""
 import argparse
 import json
 import os
@@ -15,7 +15,7 @@ from tips.app.reports import build_report
 from tips.config import DATA_DIR, PROTOTYPE_DIR, get_secret
 from tips.domain.errors import ERRORS, PaymentError
 from tips.domain.qr_sign import parse_time
-from tips.jobs.reconcile import reconcile
+from tips.jobs.reconcile import cancel_stale, reconcile
 
 
 def money_json(value):
@@ -54,10 +54,10 @@ def main():
     parser.add_argument("--from", dest="from_date", help="report: первый день YYYY-MM-DD (включительно)")
     parser.add_argument("--to", dest="to_date", help="report: последний день YYYY-MM-DD (включительно)")
     parser.add_argument("--daily", action="store_true", help="report: разбивка по дням для --merchant")
-    parser.add_argument("args", nargs="*", help="[pay|create|confirm|cancel|reconcile|qr|report] аргумент")
+    parser.add_argument("args", nargs="*", help="[pay|create|confirm|cancel|reconcile|autocancel|qr|report] аргумент")
     ns = parser.parse_args()
 
-    commands = ("pay", "create", "confirm", "cancel", "reconcile", "qr", "report")
+    commands = ("pay", "create", "confirm", "cancel", "reconcile", "autocancel", "qr", "report")
     if not ns.args:
         parser.error("нужна команда")
     cmd, rest = (ns.args[0], ns.args[1:]) if ns.args[0] in commands else ("pay", ns.args)
@@ -71,7 +71,10 @@ def main():
         except ValueError:  # --now не в формате 2025-11-01T18:00:00Z
             raise PaymentError("VALIDATION_ERROR")
         if cmd == "reconcile":
-            emit({"closed": reconcile(store, now)})
+            emit({"closed": reconcile(store, gateway, now)})
+            sys.exit(0)
+        if cmd == "autocancel":
+            emit({"canceled": cancel_stale(store, gateway, now)})
             sys.exit(0)
         if cmd == "report":
             emit(build_report(store, ns.merchant, ns.employee, ns.from_date, ns.to_date, ns.daily))

@@ -4,6 +4,7 @@
 Ответы и коды ошибок совпадают с контрактом; клиентские операции анонимны, остальные требуют Principal (auth.py).
 """
 import json
+import os
 import re
 import uuid
 from datetime import datetime, timezone
@@ -27,13 +28,15 @@ from tips.app.qr import create_qr, get_qr_view
 from tips.app.reports import build_report
 from tips.app.tokens import hash_token, new_token, token_matches
 from tips.config import get_secret
+from tips.domain.qr_sign import as_keys
 from tips.domain.errors import PaymentError, RateLimited, Unauthenticated
-from tips.http import auth
+from tips.http import auth, guard
+from tips.http.limits import Limiter, client_ip, proxy_hops_from_env
 from tips.http.errors import error_body, http_error_handler, payment_error_handler, validation_error_handler
 from tips.http.serialize import payment_json, qr_view_json
 
-QR_ID = re.compile(r"^qr_[0-9]{3}$")
-PAYMENT_ID = re.compile(r"^p_[0-9]{4}$")
+QR_ID = re.compile(r"^qr_[0-9]{3,12}$")
+PAYMENT_ID = re.compile(r"^p_[0-9]{4,12}$")
 MERCHANT_ID = re.compile(r"^m_[0-9]{3}$")
 EMPLOYEE_ID = re.compile(r"^e_[0-9]{3}$")
 SIG = re.compile(r"^[a-f0-9]{16}$")
@@ -50,9 +53,15 @@ def invalid():
 
 
 async def read_json(request):
-    """Тело запроса как объект; дробные числа остаются Decimal, чтобы 637.005 не превратилось в 637.0 молча."""
+    """Тело запроса как объект; дробные числа остаются Decimal, чтобы 637.005 не превратилось в 637.0 молча.
+    Читается потоком с ограничением размера: заявленная длина может быть неправдой, а тела без длины бывают."""
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > guard.MAX_BODY:
+            raise invalid()
     try:
-        return json.loads(await request.body(), parse_float=Decimal)
+        return json.loads(bytes(body), parse_float=Decimal)
     except ValueError:
         raise invalid()
 
@@ -61,25 +70,35 @@ def matches(pattern, value):
     return isinstance(value, str) and pattern.match(value) is not None
 
 
-def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None, passwords=None):
-    """Собрать приложение. Параметры нужны тестам: свой движок, шлюз, ключи и часы (QR из seed истекли в 2025 году)."""
-    app = FastAPI(title="Tips Platform", version="1.0.0", description="Онлайн-чаевые для сети «Вкус-Сервис»")
+def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None, passwords=None,
+               limiter=None, proxy_hops=None, production=None, cors_origins=None):
+    """Собрать приложение. Параметры нужны тестам: свой движок, шлюз, ключи, часы (QR из seed истекли в 2025 году)
+    и лимиты. Настройки среды: TIPS_ENV (production по умолчанию: документация API и HSTS; development открывает
+    /docs), TIPS_TRUSTED_PROXY_HOPS (сколько прокси перед сервисом), TIPS_CORS_ORIGINS (список источников)."""
+    if production is None:
+        production = os.environ.get("TIPS_ENV", "production") != "development"
+    if cors_origins is None:
+        cors_origins = [o.strip() for o in os.environ.get("TIPS_CORS_ORIGINS", "").split(",") if o.strip()]
+    docs = {} if not production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    app = FastAPI(title="Tips Platform", version="1.0.0", description="Онлайн-чаевые для сети «Вкус-Сервис»", **docs)
     app.state.engine = engine or make_engine()
     app.state.gateway = gateway or EmulatorGateway()
     key = secret if secret is not None else get_secret()
-    app.state.secret = key.encode() if isinstance(key, str) else key
+    app.state.secret = as_keys(key.encode() if isinstance(key, str) else key)
     app.state.clock = clock or utc_now
     app.state.keyring = keyring or Keyring.from_env()
     app.state.passwords = passwords or Passwords()
+    app.state.limiter = limiter or Limiter()
+    app.state.proxy_hops = proxy_hops if proxy_hops is not None else proxy_hops_from_env()
 
     app.add_exception_handler(PaymentError, payment_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
 
     @app.exception_handler(RateLimited)
-    async def rate_limited(_request, _exc):
+    async def rate_limited(_request, exc):
         _, body = error_body("RATE_LIMITED")
-        return JSONResponse(body, status_code=429, headers={"Retry-After": "1", **NO_STORE})
+        return JSONResponse(body, status_code=429, headers={"Retry-After": str(exc.retry_after), **NO_STORE})
 
     @app.exception_handler(Unauthenticated)
     async def unauthenticated(_request, _exc):
@@ -89,13 +108,36 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
     def store():
         return SqlStore(app.state.engine)
 
+    def ip_of(request):
+        return client_ip(request, app.state.proxy_hops)
+
+    async def rate(request, rule, key=None):
+        """Учесть запрос по правилу; ключ всегда начинается с адреса клиента."""
+        ip = ip_of(request)
+        full = ip if key is None else f"{ip}:{key}"
+        await run_in_threadpool(lambda: app.state.limiter.check(store(), rule, full, app.state.clock()))
+
+    async def bad_signature_gate(request, qr_id):
+        """5 неверных подписей по одной паре «адрес и qr_id» блокируют её на 15 минут: подпись не подобрать."""
+        if matches(QR_ID, qr_id):
+            key = f"{ip_of(request)}:{qr_id}"
+            await run_in_threadpool(lambda: app.state.limiter.blocked(store(), "bad_sig", key, app.state.clock()))
+
+    async def note_bad_signature(request, qr_id):
+        if matches(QR_ID, qr_id):
+            key = f"{ip_of(request)}:{qr_id}"
+            await run_in_threadpool(lambda: app.state.limiter.record(store(), "bad_sig", key, app.state.clock()))
+
     async def principal(request):
         """Кто вызывает: проверенный JWT и действующий пользователь в базе. Иначе 401."""
         scheme, _, token = request.headers.get("authorization", "").partition(" ")
         if scheme.lower() != "bearer" or not token.strip():
             raise Unauthenticated()
-        return await run_in_threadpool(
+        who = await run_in_threadpool(
             lambda: auth_service.authenticate(store(), app.state.keyring, token.strip(), app.state.clock()))
+        await run_in_threadpool(
+            lambda: app.state.limiter.check(store(), "protected", who.user_id, app.state.clock()))
+        return who
 
     def owned_payment(payment_id, token):
         """Платёж по id и токену. Чужой токен и несуществующий id дают один и тот же NOT_FOUND."""
@@ -111,15 +153,27 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
 
     @app.get("/health")
     def health():
+        """Живость и доступность базы: балансировщик не должен слать запросы туда, где база недоступна."""
+        try:
+            store().ping()
+        except Exception:  # noqa: BLE001
+            return JSONResponse({"status": "degraded"}, status_code=503, headers=NO_STORE)
         return {"status": "ok"}
 
     # ---------- клиент (без авторизации) ----------
 
     @app.get("/api/v1/qr/{qr_id}")
-    async def qr_for_form(qr_id: str, sig: str = ""):
-        if not matches(QR_ID, qr_id) or not matches(SIG, sig):
-            raise PaymentError("INVALID_QR")  # как и неверная подпись: не подсказываем, что именно не так
-        view = await run_in_threadpool(lambda: get_qr_view(qr_id, sig, app.state.secret, store(), app.state.clock()))
+    async def qr_for_form(qr_id: str, request: Request, sig: str = ""):
+        await rate(request, "qr_view")
+        await bad_signature_gate(request, qr_id)
+        try:
+            if not matches(QR_ID, qr_id) or not matches(SIG, sig):
+                raise PaymentError("INVALID_QR")  # как и неверная подпись: не подсказываем, что именно не так
+            view = await run_in_threadpool(lambda: get_qr_view(qr_id, sig, app.state.secret, store(), app.state.clock()))
+        except PaymentError as exc:
+            if exc.code == "INVALID_QR":
+                await note_bad_signature(request, qr_id)
+            raise
         return qr_view_json(view)
 
     @app.post("/api/v1/tips")
@@ -134,6 +188,9 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
             raise invalid()
         if not isinstance(req.get("sig"), str):
             raise invalid()
+        qr_id = req.get("qr_id") if matches(QR_ID, req.get("qr_id")) else "invalid"
+        await rate(request, "tip_create", qr_id)
+        await bad_signature_gate(request, qr_id)
 
         def work():
             s = store()
@@ -143,7 +200,12 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
                 s.set_confirm_token(payment["payment_id"], hash_token(token))
             return payment, replay, token
 
-        payment, replay, token = await run_in_threadpool(work)
+        try:
+            payment, replay, token = await run_in_threadpool(work)
+        except PaymentError as exc:
+            if exc.code == "INVALID_QR":
+                await note_bad_signature(request, qr_id)
+            raise
         return JSONResponse(payment_json(payment, token), status_code=200 if replay else 201)
 
     @app.get("/api/v1/payments/{payment_id}")
@@ -151,6 +213,7 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
         token = request.headers.get("x-payment-token")
         if not token:
             raise invalid()
+        await rate(request, "pay_status", payment_id if matches(PAYMENT_ID, payment_id) else "invalid")
         _, payment = await run_in_threadpool(lambda: owned_payment(payment_id, token))
         return payment_json(payment)
 
@@ -163,6 +226,7 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
 
     @app.post("/api/v1/payments/{payment_id}/confirm")
     async def confirm(payment_id: str, request: Request):
+        await rate(request, "pay_action", payment_id if matches(PAYMENT_ID, payment_id) else "invalid")
         token = await token_from_body(request)
 
         def work():
@@ -174,6 +238,7 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
 
     @app.post("/api/v1/payments/{payment_id}/cancel")
     async def cancel(payment_id: str, request: Request):
+        await rate(request, "pay_action", payment_id if matches(PAYMENT_ID, payment_id) else "invalid")
         token = await token_from_body(request)
 
         def work():
@@ -192,6 +257,7 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
 
     @app.post("/api/v1/auth/login")
     async def login(request: Request):
+        await rate(request, "login")
         body = await body_object(request)
         pair = await run_in_threadpool(lambda: auth_service.login(
             store(), app.state.keyring, app.state.passwords, body.get("login"), body.get("password"), app.state.clock()))
@@ -199,6 +265,7 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
 
     @app.post("/api/v1/auth/refresh")
     async def refresh(request: Request):
+        await rate(request, "refresh")
         body = await body_object(request)
         pair = await run_in_threadpool(lambda: auth_service.refresh(
             store(), app.state.keyring, body.get("refresh_token"), app.state.clock()))
@@ -206,6 +273,7 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
 
     @app.post("/api/v1/auth/logout")
     async def logout(request: Request):
+        await rate(request, "refresh")
         body = await body_object(request)
         if not isinstance(body.get("refresh_token"), str):
             raise invalid()
@@ -270,4 +338,5 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
             raise PaymentError("NOT_FOUND")
         return {"merchant_id": merchant_id, "status": status}
 
+    guard.install(app, app.state.limiter, app.state.proxy_hops, production, cors_origins)
     return app

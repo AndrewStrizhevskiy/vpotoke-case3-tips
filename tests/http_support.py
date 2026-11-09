@@ -37,6 +37,7 @@ if HAVE_DEPS:
     from tips.adapters.sql.store import SqlStore
     from tips.app import users as user_service
     from tips.http.app import create_app
+    from tips.http.limits import Limiter
 
 SECRET = os.environ.get("TIPS_HMAC_SECRET", "")
 NOW = datetime(2025, 11, 1, 18, 0, 0, tzinfo=timezone.utc)
@@ -79,6 +80,8 @@ class SlowGateway:
 
 
 class HttpTestBase(unittest.TestCase):
+    LIMIT_SCALE = 1000  # обычные тесты не упираются в лимиты; test_hardening задаёт 1 и проверяет сами лимиты
+    PROXY_HOPS = 0
     def setUp(self):
         self.url = database_url()
         if not self.url:
@@ -92,7 +95,8 @@ class HttpTestBase(unittest.TestCase):
         self.keyring = Keyring(KID, private)
         # дешёвые параметры argon2 только для скорости тестов; боевые параметры по умолчанию в Passwords()
         self.passwords = Passwords(PasswordHasher(time_cost=1, memory_cost=8, parallelism=1))
-        self.app = create_app(self.engine, self.gateway, SECRET, lambda: self.now, self.keyring, self.passwords)
+        self.app = create_app(self.engine, self.gateway, SECRET, lambda: self.now, self.keyring, self.passwords,
+                              limiter=Limiter(scale=self.LIMIT_SCALE), proxy_hops=self.PROXY_HOPS)
         self._tokens = {}
         self.client = TestClient(self.app)
         self.contract = contract_check.Contract()

@@ -10,8 +10,15 @@ PAY_URL = "https://tips.example/pay"
 
 
 def get_secret():
-    """ADR-009: без значения по умолчанию, нет переменной — нет запуска."""
+    """ADR-009: без значения по умолчанию, нет переменной — нет запуска.
+
+    TIPS_HMAC_SECRET подписывает новые QR; TIPS_HMAC_SECRET_PREVIOUS (через запятую) — ключи, которыми ещё
+    подписаны живые QR: проверяются, но не используются для подписи.
+    """
+    from tips.domain.qr_sign import QrKeys
+
     value = os.environ.get("TIPS_HMAC_SECRET")
     if not value:
         sys.exit("Ошибка: не задана переменная окружения TIPS_HMAC_SECRET")
-    return value.encode()
+    previous = [p.strip().encode() for p in os.environ.get("TIPS_HMAC_SECRET_PREVIOUS", "").split(",") if p.strip()]
+    return QrKeys(value.encode(), previous)
