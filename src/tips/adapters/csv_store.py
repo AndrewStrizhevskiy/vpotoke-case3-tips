@@ -66,7 +66,7 @@ class CsvStore:
         """Перезапись через временный файл: файл не остаётся наполовину записанным."""
         tmp = self.payments_path + ".part"
         with open(tmp, "w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=OUT_FIELDS)
+            w = csv.DictWriter(f, fieldnames=OUT_FIELDS, extrasaction="ignore")  # поля v2 (api_version) в CSV не пишутся
             w.writeheader()
             w.writerows(rows)
         os.replace(tmp, self.payments_path)
@@ -128,11 +128,11 @@ class CsvStore:
     def all_qrs(self):
         return read_csv(self.qr_file) + self.qrs()
 
-    def live_qr_for_receipt(self, merchant_id, receipt_id, now):
+    def live_qr_for_receipt(self, merchant_id, receipt_id, now, version=1):
         for row in self.all_qrs():
             if row["merchant_id"] == merchant_id and row["receipt_id"] == receipt_id and parse_time(row["exp"]) >= now:
                 return row
-        return None
+        return None  # CSV хранит только QR версии 1
 
     def lock_receipt(self, merchant_id, receipt_id):
         return None

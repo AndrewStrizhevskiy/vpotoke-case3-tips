@@ -22,13 +22,18 @@ log = logging.getLogger("tips.worker")
 KEEP_RATE_WINDOWS = timedelta(hours=2)  # самое длинное окно лимитов 15 минут
 
 
-def run_once(store, gateway, now):
+def run_once(store, gateway, now, provider=None):
     """Один проход всех задач. Отказ одной задачи не мешает остальным."""
     report = {}
     details = {}
-    for name, job in (("reconciled", lambda: reconcile(store, gateway, now, details)),
-                      ("canceled", lambda: cancel_stale(store, gateway, now, details=details)),
-                      ("purged_rate_windows", lambda: store.purge_rate_hits(now - KEEP_RATE_WINDOWS))):
+    jobs = [("reconciled", lambda: reconcile(store, gateway, now, details, provider)),
+            ("canceled", lambda: cancel_stale(store, gateway, now, details=details)),
+            ("purged_rate_windows", lambda: store.purge_rate_hits(now - KEEP_RATE_WINDOWS))]
+    if provider is not None:  # платежи API v2: входящие события и возвраты
+        from tips.app.provider_flow import process_inbox, process_refunds
+        jobs += [("events", lambda: process_inbox(store, provider, now)),
+                 ("refunds", lambda: process_refunds(store, provider, now, details))]
+    for name, job in jobs:
         try:
             report[name] = job()
         except Exception:  # noqa: BLE001 - задача упала: пишем и продолжаем со следующей
@@ -38,6 +43,8 @@ def run_once(store, gateway, now):
         log.error("платежи в PENDING дольше суток, нужен разбор вручную: %s", ", ".join(details["stuck"]))
     if details.get("stuck_created"):
         log.error("платежи в CREATED дольше суток, отменить у шлюза не удаётся: %s", ", ".join(details["stuck_created"]))
+    if details.get("refund_stuck"):
+        log.error("возвраты не удаются после нескольких попыток, нужен разбор вручную: %s", ", ".join(details["refund_stuck"]))
     return report
 
 

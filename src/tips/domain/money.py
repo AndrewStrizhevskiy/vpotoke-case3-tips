@@ -1,4 +1,5 @@
 """Деньги: Decimal и округление ROUND_HALF_UP (ADR-004), float для сумм не используется."""
+import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from tips.domain.errors import PaymentError
@@ -29,3 +30,15 @@ def calc_amounts(base, tip_pct=None, tip_amount=None):
 
 def fmt(value):
     return f"{value:.2f}"
+
+
+MONEY_V2 = re.compile(r"\A(0|[1-9][0-9]{0,6})\.[0-9]{2}\Z")
+
+
+def parse_money_v2(value):
+    """Сумма API v2: строка вида «637.00» с ровно двумя знаками. Число JSON и bool это ошибка формата: float
+    не должен проходить через границу API, даже если значение «круглое»."""
+    if not isinstance(value, str) or not MONEY_V2.match(value):
+        raise PaymentError("VALIDATION_ERROR")
+    return Decimal(value)
+

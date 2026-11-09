@@ -25,3 +25,4 @@ select = ["E", "F", "W"]
 [tool.ruff.lint.per-file-ignores]
 # эталонный сценарий записан плотно, как таблица команд
 "tests/golden_cli.py" = ["E401", "E501", "E701", "E702", "E731"]
+"tests/test_v2_http.py" = ["E501"]  # плотные таблицы запросов и ожиданий

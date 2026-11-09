@@ -48,8 +48,9 @@ def install(app, limiter, proxy_hops, production, cors_origins):
             declared = request.headers.get("content-length", "0")
             if declared.isascii() and declared.isdigit() and int(declared) > MAX_BODY:
                 response = json_error("VALIDATION_ERROR")
-            elif request.url.path == "/health":
-                response = await call_next(request)  # проверки живости от балансировщика лимитом не считаем
+            elif request.url.path == "/health" or request.url.path.startswith("/api/v2/webhooks/"):
+                # проверки живости и вебхуки провайдера общим лимитом не считаем (у вебхуков свой лимит в обработчике)
+                response = await call_next(request)
             else:
                 try:
                     await run_in_threadpool(

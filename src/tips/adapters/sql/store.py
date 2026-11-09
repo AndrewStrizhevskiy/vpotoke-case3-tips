@@ -4,6 +4,7 @@
 Защита от двойной оплаты держится не только на проверках в коде: уникальные индексы
 payments_one_active и payments_one_success срабатывают, даже если два запроса проскочили проверки.
 """
+import json
 import os
 from contextlib import contextmanager
 from decimal import Decimal
@@ -20,9 +21,11 @@ TS = 'to_char({col} AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24\\:MI\\:SS"Z"\')'
 PAYMENT_COLS = (
     "payment_id, merchant_id, employee_id, amount::text AS amount, tip::text AS tip, status, "
     + TS.format(col="created_at") + " AS timestamp, qr_id, idempotency_key, amount_total::text AS amount_total, "
-    "coalesce(error_code, '') AS error_code"
+    "coalesce(error_code, '') AS error_code, api_version, coalesce(provider, '') AS provider, "
+    "coalesce(provider_payment_id, '') AS provider_payment_id, next_action"
 )
-QR_COLS = "qr_id, merchant_id, employee_id, receipt_id, nonce, " + TS.format(col="exp") + " AS exp, signature"
+QR_COLS = ("qr_id, merchant_id, employee_id, receipt_id, nonce, " + TS.format(col="exp") + " AS exp, signature, "
+           "version, key_id")
 
 # уникальные индексы -> код ошибки, который видит клиент
 CONSTRAINT_ERRORS = {
@@ -93,10 +96,10 @@ class SqlStore:
                         "WHERE merchant_id = :m AND receipt_id = :r", m=merchant_id, r=receipt_id)
         return Decimal(row["amount"]) if row else None
 
-    def live_qr_for_receipt(self, merchant_id, receipt_id, now):
+    def live_qr_for_receipt(self, merchant_id, receipt_id, now, version=1):
         return self._one(f"SELECT {QR_COLS} FROM qr_codes WHERE merchant_id = :m AND receipt_id = :r "
-                         "AND exp >= CAST(:now AS timestamptz) ORDER BY qr_id LIMIT 1",
-                         m=merchant_id, r=receipt_id, now=now.strftime(TIME_FMT))
+                         "AND version = :v AND exp >= CAST(:now AS timestamptz) ORDER BY qr_id LIMIT 1",
+                         m=merchant_id, r=receipt_id, v=version, now=now.strftime(TIME_FMT))
 
     def lock_receipt(self, merchant_id, receipt_id):
         self._run("SELECT 1 FROM receipts WHERE merchant_id = :m AND receipt_id = :r FOR UPDATE", m=merchant_id, r=receipt_id)
@@ -159,11 +162,11 @@ class SqlStore:
             with self.atomic():
                 self._run(
                     "INSERT INTO payments (payment_id, qr_id, merchant_id, employee_id, amount, tip, amount_total, "
-                    "status, idempotency_key, created_at) VALUES (:pid, :qr, :m, :e, :amount, :tip, :total, :status, :key, "
-                    "CAST(:ts AS timestamptz))",
+                    "status, idempotency_key, created_at, api_version) VALUES (:pid, :qr, :m, :e, :amount, :tip, :total, "
+                    ":status, :key, CAST(:ts AS timestamptz), :api)",
                     pid=payment["payment_id"], qr=payment["qr_id"], m=payment["merchant_id"], e=payment["employee_id"],
                     amount=payment["amount"], tip=payment["tip"], total=payment["amount_total"], status=payment["status"],
-                    key=payment["idempotency_key"], ts=payment["timestamp"])
+                    key=payment["idempotency_key"], ts=payment["timestamp"], api=payment.get("api_version", 1))
                 self._audit(payment, "payment_created", None, "client", now)
         except IntegrityError as exc:
             code = CONSTRAINT_ERRORS.get(getattr(getattr(exc.orig, "diag", None), "constraint_name", None))
@@ -183,7 +186,7 @@ class SqlStore:
             changed = self._run(
                 "UPDATE payments SET status = :new, error_code = NULLIF(:err, ''), version = version + 1, "
                 "submitted_at = CASE WHEN :new = 'PENDING' THEN CAST(:ts AS timestamptz) ELSE submitted_at END, "
-                "finalized_at = CASE WHEN :new IN ('SUCCESS', 'DECLINED', 'CANCELED') THEN CAST(:ts AS timestamptz) "
+                "finalized_at = CASE WHEN :new IN ('SUCCESS', 'DECLINED', 'CANCELED', 'REFUNDED') THEN CAST(:ts AS timestamptz) "
                 "ELSE finalized_at END WHERE payment_id = :id AND status = :old",
                 new=new_status, err=error or "", ts=stamp, id=payment["payment_id"], old=old)
             if changed == 0:
@@ -194,6 +197,62 @@ class SqlStore:
 
     def ping(self):
         return self._one("SELECT 1 AS ok")["ok"] == 1
+
+    # ---- провайдер: поля платежа, входящие события, возвраты (API v2) ----
+
+    def set_provider_fields(self, payment_id, provider, provider_payment_id, next_action, provider_status=None):
+        self._run("UPDATE payments SET provider = COALESCE(:prov, provider), "
+                  "provider_payment_id = COALESCE(:ppid, provider_payment_id), next_action = CAST(:na AS jsonb), "
+                  "provider_status = COALESCE(:ps, provider_status) WHERE payment_id = :id",
+                  prov=provider, ppid=provider_payment_id, na=json.dumps(next_action) if next_action else None,
+                  ps=provider_status, id=payment_id)
+
+    def payment_by_provider_ref(self, provider, provider_payment_id):
+        return self._one(f"SELECT {PAYMENT_COLS} FROM payments WHERE provider = :p AND provider_payment_id = :i",
+                         p=provider, i=provider_payment_id)
+
+    def inbox_add(self, provider, event, now):
+        """Принять входящее событие провайдера; повтор того же события не добавляется (False)."""
+        return self._run(
+            "INSERT INTO gateway_events (provider, event_id, event_type, provider_payment_id, payload, received_at) "
+            "VALUES (:p, :e, :t, :i, CAST(:payload AS jsonb), CAST(:at AS timestamptz)) ON CONFLICT DO NOTHING",
+            p=provider, e=event.event_id, t=event.event_type, i=event.provider_payment_id,
+            payload=json.dumps(event.payload), at=now.strftime(TIME_FMT)) == 1
+
+    def inbox_pending(self, limit=100, max_attempts=10):
+        return self._run("SELECT provider, event_id, event_type, provider_payment_id, payload FROM gateway_events "
+                         "WHERE processed_at IS NULL AND attempts < :m ORDER BY received_at, event_id LIMIT :n",
+                         m=max_attempts, n=limit)
+
+    def inbox_mark(self, provider, event_id, now, error=None):
+        if error is None:
+            self._run("UPDATE gateway_events SET processed_at = CAST(:at AS timestamptz) "
+                      "WHERE provider = :p AND event_id = :e",
+                      at=now.strftime(TIME_FMT), p=provider, e=event_id)
+        else:
+            self._run("UPDATE gateway_events SET attempts = attempts + 1, last_error = :err "
+                      "WHERE provider = :p AND event_id = :e", err=error[:300], p=provider, e=event_id)
+
+    def refund_create(self, refund_id, payment, now):
+        stamp = now.strftime(TIME_FMT)
+        self._run("INSERT INTO refunds (refund_id, payment_id, amount, reason, status, created_at, updated_at) "
+                  "VALUES (:r, :p, :a, 'DOUBLE_PAYMENT', 'REQUIRED', CAST(:t AS timestamptz), CAST(:t AS timestamptz)) "
+                  "ON CONFLICT DO NOTHING", r=refund_id, p=payment["payment_id"], a=payment["amount_total"], t=stamp)
+
+    def refunds_open(self, limit=50, max_attempts=5):
+        return self._run("SELECT r.refund_id, r.payment_id, r.amount::text AS amount, r.attempts, p.provider_payment_id, "
+                         "p.provider FROM refunds r JOIN payments p USING (payment_id) "
+                         "WHERE r.status IN ('REQUIRED', 'PENDING') AND r.attempts < :m ORDER BY r.created_at LIMIT :n",
+                         m=max_attempts, n=limit)
+
+    def refunds_failed(self, max_attempts=5):
+        return self._run("SELECT refund_id, payment_id FROM refunds WHERE status IN ('REQUIRED', 'PENDING', 'FAILED') "
+                         "AND attempts >= :m", m=max_attempts)
+
+    def refund_mark(self, refund_id, status, now, provider_refund_id=None, attempt=False):
+        self._run("UPDATE refunds SET status = :s, provider_refund_id = COALESCE(:prid, provider_refund_id), "
+                  "attempts = attempts + :a, updated_at = CAST(:t AS timestamptz) WHERE refund_id = :r",
+                  s=status, prid=provider_refund_id, a=1 if attempt else 0, t=now.strftime(TIME_FMT), r=refund_id)
 
     # ---- лимиты запросов ----
 
@@ -365,8 +424,8 @@ class SqlStore:
 
     def add_qr(self, qr):
         self._run(
-            "INSERT INTO qr_codes (qr_id, merchant_id, employee_id, receipt_id, nonce, exp, signature, created_at) "
-            "VALUES (:qr, :m, :e, :r, :nonce, CAST(:exp AS timestamptz), :sig, "
+            "INSERT INTO qr_codes (qr_id, merchant_id, employee_id, receipt_id, nonce, exp, signature, version, key_id, "
+            "created_at) VALUES (:qr, :m, :e, :r, :nonce, CAST(:exp AS timestamptz), :sig, :v, :kid, "
             "CAST(:exp AS timestamptz) - interval '24 hours')",
             qr=qr["qr_id"], m=qr["merchant_id"], e=qr["employee_id"], r=qr["receipt_id"], nonce=qr["nonce"],
-            exp=qr["exp"], sig=qr["signature"])
+            exp=qr["exp"], sig=qr["signature"], v=qr.get("version", 1), kid=qr.get("key_id"))

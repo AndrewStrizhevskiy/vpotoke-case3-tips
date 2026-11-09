@@ -6,6 +6,7 @@
 import json
 import os
 import re
+import types
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -30,7 +31,10 @@ from tips.app.tokens import hash_token, new_token, token_matches
 from tips.config import get_secret
 from tips.domain.qr_sign import as_keys
 from tips.domain.errors import PaymentError, RateLimited, Unauthenticated
-from tips.http import auth, guard
+from tips.adapters.provider.factory import make_provider
+from tips.domain import ids
+from tips.domain.qr_v2 import QrV2Keys
+from tips.http import auth, guard, v2
 from tips.http.limits import Limiter, client_ip, proxy_hops_from_env
 from tips.http.errors import error_body, http_error_handler, payment_error_handler, validation_error_handler
 from tips.http.serialize import payment_json, qr_view_json
@@ -66,12 +70,18 @@ async def read_json(request):
         raise invalid()
 
 
+def is_qr_id(value):
+    """Идентификатор QR любой версии: ключ блокировки по неверным подписям не должен зависеть от формата."""
+    return matches(QR_ID, value) or matches(ids.QR_V2, value)
+
+
 def matches(pattern, value):
-    return isinstance(value, str) and pattern.match(value) is not None
+    return isinstance(value, str) and pattern.fullmatch(value) is not None  # fullmatch: «$» пропускал бы \n в конце
 
 
 def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None, passwords=None,
-               limiter=None, proxy_hops=None, production=None, cors_origins=None):
+               limiter=None, proxy_hops=None, production=None, cors_origins=None, qr_keys=None, provider=None,
+               front_url=None, enable_v1=True):
     """Собрать приложение. Параметры нужны тестам: свой движок, шлюз, ключи, часы (QR из seed истекли в 2025 году)
     и лимиты. Настройки среды: TIPS_ENV (production по умолчанию: документация API и HSTS; development открывает
     /docs), TIPS_TRUSTED_PROXY_HOPS (сколько прокси перед сервисом), TIPS_CORS_ORIGINS (список источников)."""
@@ -90,7 +100,10 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
     app.state.passwords = passwords or Passwords()
     app.state.limiter = limiter or Limiter()
     app.state.proxy_hops = proxy_hops if proxy_hops is not None else proxy_hops_from_env()
-
+    # API v2 включается, когда заданы ключи QR v2 (TIPS_QR_KEYS); адрес формы TIPS_FRONT_URL; провайдер TIPS_PROVIDER
+    app.state.qr_keys = qr_keys or (QrV2Keys.from_env() if os.environ.get("TIPS_QR_KEYS") else None)
+    app.state.provider = provider if provider is not None else (make_provider(production) if app.state.qr_keys else None)
+    app.state.front_url = (front_url or os.environ.get("TIPS_FRONT_URL", "https://tips.example/p")).rstrip("/")
     app.add_exception_handler(PaymentError, payment_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
@@ -119,12 +132,12 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
 
     async def bad_signature_gate(request, qr_id):
         """5 неверных подписей по одной паре «адрес и qr_id» блокируют её на 15 минут: подпись не подобрать."""
-        if matches(QR_ID, qr_id):
+        if is_qr_id(qr_id):
             key = f"{ip_of(request)}:{qr_id}"
             await run_in_threadpool(lambda: app.state.limiter.blocked(store(), "bad_sig", key, app.state.clock()))
 
     async def note_bad_signature(request, qr_id):
-        if matches(QR_ID, qr_id):
+        if is_qr_id(qr_id):
             key = f"{ip_of(request)}:{qr_id}"
             await run_in_threadpool(lambda: app.state.limiter.record(store(), "bad_sig", key, app.state.clock()))
 
@@ -338,5 +351,14 @@ def create_app(engine=None, gateway=None, secret=None, clock=None, keyring=None,
             raise PaymentError("NOT_FOUND")
         return {"merchant_id": merchant_id, "status": status}
 
+    if app.state.qr_keys is not None:
+        v2.install(app, types.SimpleNamespace(
+            store=store, rate=rate, bad_signature_gate=bad_signature_gate, note_bad_signature=note_bad_signature,
+            principal=principal, read_json=read_json, invalid=invalid, matches=matches, no_store=NO_STORE,
+            max_body=guard.MAX_BODY))
+    if not enable_v1:  # после перехода клиентов на v2 гостевые операции v1 отключаются; вход и отчёты остаются
+        v1_guest = {"/api/v1/qr", "/api/v1/qr/{qr_id}", "/api/v1/tips", "/api/v1/payments/{payment_id}",
+                    "/api/v1/payments/{payment_id}/confirm", "/api/v1/payments/{payment_id}/cancel"}
+        app.router.routes = [r for r in app.router.routes if getattr(r, "path", None) not in v1_guest]
     guard.install(app, app.state.limiter, app.state.proxy_hops, production, cors_origins)
     return app

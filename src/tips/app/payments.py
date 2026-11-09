@@ -4,6 +4,7 @@ from decimal import Decimal
 from tips.domain.errors import PaymentError, StateChanged
 from tips.domain.money import MAX_BASE, MAX_TIP_SHARE, MAX_TOTAL, calc_amounts, fmt, to_money
 from tips.domain.qr_sign import TIME_FMT, check_exp, verify_signature
+from tips.domain.qr_v2 import qr_version
 from tips.domain.validation import validate_request
 
 
@@ -25,10 +26,16 @@ def create_payment(req, secret, store, now):
         raise PaymentError("VALIDATION_ERROR")
 
     # Q-1. Неизвестный qr_id и плохая подпись дают один ответ: перебор id ничего не раскрывает.
+    # v1 принимает только QR версии 1: QR v2 нельзя оплатить по ослабленному 64-битному пути.
     qr = store.find_qr(qr_id)
-    if qr is None or not verify_signature(secret, qr, req.get("sig")):
+    if qr is None or qr_version(qr) != 1 or not verify_signature(secret, qr, req.get("sig")):
         raise PaymentError("INVALID_QR")
+    return create_payment_core(store, qr, now, key, req["receipt_id"], base, tip_pct, tip_in, store.next_payment_id, 1)
 
+
+def create_payment_core(store, qr, now, key, receipt_id, base, tip_pct, tip_in, new_id, api_version):
+    """Общее ядро v1 и v2: формат запроса и подпись QR уже проверены вызывающим, идентификатор выдаёт new_id."""
+    qr_id = qr["qr_id"]
     # P-2 (ADR-008). Повтор ключа раньше проверок exp/nonce: иначе повтор после SUCCESS
     # получил бы QR_USED вместо уже созданного платежа.
     # Проверки и вставка идут под блокировкой строки QR: параллельные запросы по одному QR выстраиваются в очередь,
@@ -38,7 +45,7 @@ def create_payment(req, secret, store, now):
         existing = store.payments_for_qr(qr_id)
         for p in existing:
             if p["idempotency_key"] == key:
-                same = p["amount"] == fmt(base) and req["receipt_id"] == qr["receipt_id"] and (
+                same = p["amount"] == fmt(base) and receipt_id == qr["receipt_id"] and (
                     tip_in == Decimal(p["tip"]) if tip_in is not None
                     else Decimal(p["tip"]) == calc_amounts(base, tip_pct)[0])
                 if not same:
@@ -52,7 +59,7 @@ def create_payment(req, secret, store, now):
             raise PaymentError("QR_USED")
         if store.merchant_status(qr["merchant_id"]) != "ACTIVE":
             raise PaymentError("MERCHANT_BLOCKED")
-        if req["receipt_id"] != qr["receipt_id"]:  # Q-5: чек из запроса должен быть чеком этого QR
+        if receipt_id != qr["receipt_id"]:  # Q-5: чек из запроса должен быть чеком этого QR
             raise PaymentError("RECEIPT_MISMATCH")
 
         # Сумма чека — серверная правда (ADR-003), затем P-1, Q-6, P-3
@@ -76,7 +83,7 @@ def create_payment(req, secret, store, now):
             raise PaymentError("PAYMENT_IN_PROGRESS")
 
         payment = {
-            "payment_id": store.next_payment_id(),
+            "payment_id": new_id(),
             "merchant_id": qr["merchant_id"],
             "employee_id": qr["employee_id"],
             "amount": fmt(base),
@@ -87,6 +94,7 @@ def create_payment(req, secret, store, now):
             "idempotency_key": key,
             "amount_total": fmt(total),
             "error_code": "",
+            "api_version": api_version,
         }
         store.insert_payment(payment, now)
         return payment, False

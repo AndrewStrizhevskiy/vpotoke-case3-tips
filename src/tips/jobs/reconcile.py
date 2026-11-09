@@ -31,12 +31,42 @@ def _note(details, key, payment_id):
         details.setdefault(key, []).append(payment_id)
 
 
-def reconcile(store, gateway, now, details=None):
-    """Закрывает PENDING старше RECONCILE_AFTER по ответу шлюза. Возвращает номера платежей, получивших итог."""
+def _reconcile_provider(store, provider, p, now, details):
+    """Платёж API v2: статус по reference у провайдера. Возвращает итоговый статус или None, если закрывать рано."""
+    from tips.adapters.provider import base as pb
+    from tips.app.provider_flow import apply_provider_status
+
+    result = provider.get_status(reference=p["payment_id"], provider_payment_id=p.get("provider_payment_id") or None)
+    age = now - store.pending_since(p)
+    if result.status in (pb.SUCCEEDED, pb.FAILED):
+        return apply_provider_status(store, p["payment_id"], result, provider, now, "system")["status"]
+    if result.status == pb.NOT_FOUND and age >= RECONCILE_AFTER + provider.not_found_grace:
+        store.transition(p, "DECLINED", "GATEWAY_TIMEOUT", "payment_declined", "system", now)  # провайдер платёж не знает
+        return "DECLINED"
+    if result.status == pb.ACTION_REQUIRED and age >= CREATED_TTL:  # клиент ушёл со страницы 3-D Secure
+        if provider.void(result.provider_payment_id or p.get("provider_payment_id")):
+            store.transition(p, "DECLINED", "GATEWAY_TIMEOUT", "payment_declined", "system", now)
+            return "DECLINED"
+    if age >= STUCK_AFTER:
+        _note(details, "stuck", p["payment_id"])
+    return None
+
+
+def reconcile(store, gateway, now, details=None, provider=None):
+    """Закрывает PENDING старше RECONCILE_AFTER по ответу шлюза (v1) или провайдера (v2).
+    Возвращает номера платежей, получивших итог."""
     finished = []
     grace = getattr(gateway, "not_found_grace", timedelta(0))
     for p in store.stale_pending(now - RECONCILE_AFTER, BATCH):
         try:
+            if p.get("provider"):  # платёж API v2: спрашиваем провайдера, а не эмулятор
+                if provider is None or provider.name != p["provider"]:
+                    continue
+                outcome = _reconcile_provider(store, provider, p, now, details)
+                if outcome is not None:
+                    finished.append(p["payment_id"])
+                    _note(details, outcome, p["payment_id"])
+                continue
             qr = store.find_qr(p["qr_id"])
             if qr is None:  # QR недоступен (другой файл в CSV-режиме): итог узнать не у кого
                 continue
